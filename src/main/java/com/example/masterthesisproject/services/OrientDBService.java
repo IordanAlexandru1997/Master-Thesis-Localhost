@@ -18,11 +18,11 @@ public class OrientDBService {
     private final String ORIENTDB_URL = "remote:localhost";
     private final String DATABASE_NAME = "orientdb";
     private final String USERNAME = "root";
-    private final String PASSWORD = "password";
+    private final String PASSWORD = "parola";
 
     @PostConstruct
     public void init() {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig())) {
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, USERNAME, PASSWORD, OrientDBConfig.defaultConfig())) {
             if (!orientDB.exists(DATABASE_NAME)) {
                 orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
             }
