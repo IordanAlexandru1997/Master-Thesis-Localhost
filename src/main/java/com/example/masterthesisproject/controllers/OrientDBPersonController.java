@@ -4,14 +4,17 @@ import com.example.masterthesisproject.services.OrientDBService;
 import com.example.masterthesisproject.entities.Person;
 import com.orientechnologies.orient.core.record.OElement;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-
+import java.util.stream.Collectors;
 
 @RestController
+@ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('orientdb')}")
+
 public class OrientDBPersonController {
 
     @Autowired
@@ -24,8 +27,16 @@ public class OrientDBPersonController {
     }
 
     @GetMapping("/orientperson/{name}")
-    public ResponseEntity<List<OElement>> getPersonsByName(@PathVariable String name) {
+    public ResponseEntity<List<Person>> getPersonsByName(@PathVariable String name) {
         List<OElement> persons = orientDBService.getPersonsByName(name);
-        return new ResponseEntity<>(persons, HttpStatus.OK);
+        List<Person> personList = persons.stream()
+                .map(element -> {
+                    Person person = new Person();
+                    person.setName(element.getProperty("name"));
+                    person.setAge(element.getProperty("age"));
+                    return person;
+                })
+                .collect(Collectors.toList());
+        return new ResponseEntity<>(personList, HttpStatus.OK);
     }
 }
