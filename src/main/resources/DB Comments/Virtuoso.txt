@@ -1,0 +1,1 @@
+- Apache Jena incompatibility with latest java version, no updated jdbc / maven repo

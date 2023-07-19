@@ -1,0 +1,3 @@
+-> extremely slow documentation web page. The whole documentation is on one page and it loads very slow
+-> deprecated classes and methods in the documentation !!
+->

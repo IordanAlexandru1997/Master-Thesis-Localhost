@@ -1,85 +1,54 @@
 package com.example.masterthesisproject.services;
 
+import com.arcadedb.database.Database;
+import com.arcadedb.database.DatabaseFactory;
+import com.arcadedb.database.MutableDocument;
+import com.arcadedb.query.sql.executor.ResultSet;
+import com.arcadedb.query.sql.executor.Result;
 import com.example.masterthesisproject.entities.Person;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 
-// Connection string:
-// docker run --rm -p 2424:2424 --env JAVA_OPTS="-Darcadedb.server.rootPassword=playwithdata" arcadedata/arcadedb:latest
-
-
-// Database needs to be setup on the interface
-// minimum 8 chars for the password
-// insightful logs in terminal
-// Important note, hashed localhost address to the interface in the terminal is not working
-
-
-//CREATE VERTEX TYPE Person
-//CREATE EDGE TYPE Friends
-//INSERT INTO Person CONTENT { "name": "Alice", "age": 30 };
-//INSERT INTO Person CONTENT { "name": "Bob", "age": 35 };
-//CREATE EDGE Friends FROM (SELECT FROM Person WHERE name = 'Alice') TO (SELECT FROM Person WHERE name = 'Bob')
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('arcadedb')}")
 
 public class ArcadeDBService {
-    private static final String ARCADEDB_URL = "http://localhost:2480";
-    private static final String DATABASE_NAME = "PersonDB";
-    private static final String COLLECTION_NAME = "Person";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final String ARCADEDB_URL = "/databases/arcadedb";
+    private final String USERNAME = "root";
+    private final String PASSWORD = "parola1234";
 
-    public void createDatabase() {
-        try {
-            String query = String.format("CREATE DATABASE %s", DATABASE_NAME);
-            executeQuery(query);
-        } catch (HttpClientErrorException e) {
-            // Handle the exception
+    private Database database;
+
+    public ArcadeDBService() {
+        DatabaseFactory databaseFactory = new DatabaseFactory(ARCADEDB_URL);
+        if (!databaseFactory.exists()) {
+            this.database = databaseFactory.create();
+        } else {
+            this.database = databaseFactory.open();
         }
-    }
-
-    public void createCollection() {
-        try {
-            String query = String.format("CREATE VERTEX TYPE %s", COLLECTION_NAME);
-            executeQuery(query);
-        } catch (HttpClientErrorException e) {
-            // Handle the exception
-        }
+        this.database.command("sql", "CREATE VERTEX TYPE Person IF NOT EXISTS");
+        this.database.command("sql", "CREATE EDGE TYPE FRIENDS_WITH IF NOT EXISTS");
     }
 
     public void insertPerson(Person person) {
-        String query = String.format(
-                "INSERT INTO %s CONTENT {\"name\": \"%s\", \"age\": %d}",
-                COLLECTION_NAME, person.getName(), person.getAge());
-
-        executeQuery(query);
+        this.database.command("sql", "INSERT INTO Person SET name = ?, age = ?", person.getName(), person.getAge());
     }
 
-    public String getPersonsByName(String name) {
-        String query = String.format(
-                "SELECT FROM %s WHERE name = \"%s\"",
-                COLLECTION_NAME, name);
-
-        return executeQuery(query);
-    }
-
-    private String executeQuery(String query) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBasicAuth("root", "parola1234");
-
-        HttpEntity<String> entity = new HttpEntity<>(query, headers);
-
-        ResponseEntity<String> response = restTemplate.exchange(
-                ARCADEDB_URL + "/query/" + DATABASE_NAME + "/sql",
-                HttpMethod.POST, entity, String.class);
-
-        return response.getBody();
+    public List<Person> getPersons() {
+        ResultSet resultSet = this.database.query("sql", "SELECT FROM Person");
+        List<Person> persons = new ArrayList<>();
+        while (resultSet.hasNext()) {
+            Result result = resultSet.next();
+            if (result.getElement().isPresent()) {
+                MutableDocument vertex = (MutableDocument) result.getElement().get().asDocument();
+                Person person = new Person(vertex.get("name").toString(), Integer.parseInt(vertex.get("age").toString()));
+                persons.add(person);
+            }
+        }
+        return persons;
     }
 }

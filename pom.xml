@@ -77,6 +77,20 @@
             <artifactId>janusgraph-core</artifactId>
             <version>0.5.3</version>
         </dependency>
+        <!-- jena-sparql-api-virtuoso -->
+        <dependency>
+            <groupId>org.aksw.jena-sparql-api</groupId>
+            <artifactId>jena-sparql-api-virtuoso</artifactId>
+            <version>3.17.0-1</version>
+        </dependency>
+
+
+        <!-- Apache HttpClient -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.13</version>
+        </dependency>
         <!-- Virtuoso -->
         <dependency>
             <groupId>com.openlink.virtuoso</groupId>
@@ -85,11 +99,37 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/virtuoso_jdbc/virtjdbc4.jar</systemPath>
         </dependency>
+        <!-- Apache Jena for Virtuoso-->
+        <dependency>
+            <groupId>org.apache.jena</groupId>
+            <artifactId>apache-jena-libs</artifactId>
+            <type>pom</type>
+            <version>4.2.0</version>
+        </dependency>
         <!-- ArcadeDB -->
         <dependency>
             <groupId>com.arcadedb</groupId>
             <artifactId>arcadedb-engine</artifactId>
             <version>23.6.1</version>
+        </dependency>
+        <!-- ArcadeDB Server -->
+        <dependency>
+            <groupId>com.arcadedb</groupId>
+            <artifactId>arcadedb-server</artifactId>
+            <version>23.6.1</version>
+        </dependency>
+        <!-- GraalSDK needed for arcadedb -->
+        <dependency>
+            <groupId>org.graalvm.sdk</groupId>
+            <artifactId>graal-sdk</artifactId>
+            <version>23.0.0</version>
+        </dependency>
+
+        <!--        PostgreSQL jdbc needed for arcadedb-->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.6.0</version>
         </dependency>
     </dependencies>
 
