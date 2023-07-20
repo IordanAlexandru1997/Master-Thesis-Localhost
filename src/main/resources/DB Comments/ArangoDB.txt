@@ -1,1 +1,2 @@
 ArangoDB - multimodel NoSQL database. It is hard to model the graph relationships. Not as straightforward -> higher complexity.
+- expects the UID to be a string (names). It is not possible to use numbers as UIDs.

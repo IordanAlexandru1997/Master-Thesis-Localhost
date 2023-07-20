@@ -2,7 +2,6 @@ package com.example.masterthesisproject.entities;
 
 public class Employee {
     private String name;
-    private int age;
     private double salary;
     private String id;
     private String department;
@@ -11,16 +10,15 @@ public class Employee {
     public Employee(){
 
     }
-    public Employee(String name, int age, double salary, String id, String department, String position) {
+    public Employee(String name,  double salary, String id, String department, String position) {
         this.name = name;
         this.salary = salary;
         this.id = id;
         this.department = department;
     }
 
-    public Employee(String employeeName, int age) {
+    public Employee(String employeeName ) {
         this.name = employeeName;
-        this.age = age;
     }
 
     // Getters and Setters

@@ -41,8 +41,7 @@ public class Neo4jProjectController {
         List<Employee> employeeList = employeeNodes.stream()
                 .map(node -> {
                     String employeeName = node.get("name").asString();
-                    int age = node.get("age").asInt();
-                    return new Employee(employeeName, age);  // Please adjust according to your Employee class constructor
+                    return  new Employee(employeeName);  // Please adjust according to your Employee class constructor
                 })
                 .collect(Collectors.toList());
         return new ResponseEntity<>(employeeList, HttpStatus.OK);

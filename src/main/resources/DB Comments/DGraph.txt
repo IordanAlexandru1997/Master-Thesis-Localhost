@@ -4,3 +4,9 @@ In DGraph, mutations are written in RDF format, not in JSON
 -> need for committing the transaction after insert / delete
 -> need for waiting after querying. Indexing is not immediate (special method: waitForIndexing in DGraph client)
 -> Problems with Ratel (their GUI). Does not start on any port (Maybe vpn issues)
+
+
+business logic:
+does not accept double values from java by default because of the comma. Dgraph accepts only "." as decimal separator. So we need to convert the double to string and replace the comma with a dot.
+does not parse any date time fields. Unsupported type. So we need to convert the date to string and then parse it in DGraph. (DGraph does not support date time fields).
+not every dataset in RDF format is directly compatible with Dgraph. Most of them you need to treat first then make the insertion. Dgraph uses a very simple Nquads pattern, There are usually complex datasets with features that are not supported in Dgraph RDF parser. So you may have to pay attention to this.
