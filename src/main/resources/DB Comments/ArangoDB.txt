@@ -1,0 +1,1 @@
+ArangoDB - multimodel NoSQL database. It is hard to model the graph relationships. Not as straightforward -> higher complexity.

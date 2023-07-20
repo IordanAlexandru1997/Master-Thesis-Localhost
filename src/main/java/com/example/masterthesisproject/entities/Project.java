@@ -17,7 +17,9 @@ public class Project {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
-    public String getId() { return id; }
+    public String getId() {
+        return this.name; // assuming `name` is a class property
+    }
     public void setId(String id) { this.id = id; }
 
     public Employee getEmployee() { return employee; }
