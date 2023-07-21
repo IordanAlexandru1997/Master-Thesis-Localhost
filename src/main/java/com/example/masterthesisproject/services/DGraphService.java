@@ -13,6 +13,7 @@ import io.dgraph.Transaction;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
+@ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('dgraph')}")
+
 public class DGraphService {
 
     private DgraphClient dgraphClient;
@@ -90,7 +93,6 @@ public class DGraphService {
                 employee.setName(employeeName);
                 employee.setSalary(salary);
                 employee.setDepartment(department);
-                // you may also need to set uid to employee
 
                 return employee;
             } else {

@@ -29,14 +29,15 @@ public class Employee {
     public double getSalary() { return salary; }
     public void setSalary(double salary) { this.salary = salary; }
 
-    public String getId() {
-        return this.name; // assuming `name` is a class property
+//    public String getId() {
+//        return this.name; // assuming `name` is a class property
+//    }
+public String getId() {
+        return this.id; // assuming `name` is a class property
     }
     public void setId(String id) { this.id = id; }
 
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
 
-    public String getPosition() { return position; }
-    public void setPosition(String position) { this.position = position; }
 }

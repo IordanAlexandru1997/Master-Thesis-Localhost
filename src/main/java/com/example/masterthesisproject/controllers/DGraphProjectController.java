@@ -5,11 +5,14 @@ import com.example.masterthesisproject.entities.Invoice;
 import com.example.masterthesisproject.entities.Project;
 import com.example.masterthesisproject.services.DGraphService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('dgraph')}")
+
 public class DGraphProjectController {
 
     @Autowired
