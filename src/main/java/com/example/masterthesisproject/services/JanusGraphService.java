@@ -1,66 +1,76 @@
 package com.example.masterthesisproject.services;
 
+import com.example.masterthesisproject.entities.Employee;
+import com.example.masterthesisproject.entities.Invoice;
 import com.example.masterthesisproject.entities.Person;
+import com.example.masterthesisproject.entities.Project;
 import org.apache.tinkerpop.gremlin.driver.Client;
 import org.apache.tinkerpop.gremlin.driver.Cluster;
+import org.apache.tinkerpop.gremlin.driver.MessageSerializer;
 import org.apache.tinkerpop.gremlin.driver.Result;
+import org.apache.tinkerpop.gremlin.driver.ser.GryoMessageSerializerV3d0;
 import org.apache.tinkerpop.gremlin.driver.ser.Serializers;
+import org.apache.tinkerpop.gremlin.structure.io.gryo.GryoMapper;
+import org.janusgraph.graphdb.tinkerpop.JanusGraphIoRegistry;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 @Service
 public class JanusGraphService {
-    private final Client client;
+    private Client client;
 
     public JanusGraphService() {
+        GryoMapper.Builder builder = GryoMapper.build().addRegistry(JanusGraphIoRegistry.getInstance());
+        MessageSerializer serializer = new GryoMessageSerializerV3d0(builder);
+
         Cluster cluster = Cluster.build()
                 .addContactPoint("localhost")
                 .port(8182)
-                .serializer(Serializers.GRAPHBINARY_V1D0)
+                .serializer(serializer)
                 .credentials("janusgraph", "parola")
                 .create();
+
         this.client = cluster.connect();
     }
-
-    public void insertPerson(Person person) {
+    public void insertEmployee(Employee employee) {
         Map<String, Object> params = new HashMap<>();
-        params.put("name", person.getName());
-        params.put("age", person.getAge());
-        System.out.println("Inserting person with name: " + person.getName() + " and age: " + person.getAge());
-        client.submit("g.addV('person').property('name', name).property('age', age)", params).all().join();
+        params.put("name", employee.getName());
+        params.put("salary", employee.getSalary());
+        params.put("empId", employee.getId());  // changed 'id' to 'empId'
+        params.put("department", employee.getDepartment());
+        client.submit("g.addV('employee').property('name', name).property('salary', salary).property('empId', empId).property('department', department)", params).all().join();
     }
 
-    public Person getPersonsByName(String name) {
+    public void insertProject(Project project) {
         Map<String, Object> params = new HashMap<>();
-        params.put("name", name);
-        List<Result> results = client.submit("g.V().hasLabel('person').has('name', name).valueMap()", params).all().join();
-        if (!results.isEmpty()) {
-            Result result = results.get(0);
-            Map<String, Object> resultMap = result.get(Map.class);
-            List<Object> nameList = (List<Object>) resultMap.get("name");
-            List<Object> ageList = (List<Object>) resultMap.get("age");
-            String personName = (String) nameList.get(0);
-            Object ageObject = ageList.get(0);
-            Integer personAge;
-            if (ageObject instanceof String) {
-                personAge = Integer.parseInt((String) ageObject);
-            } else if (ageObject instanceof Integer) {
-                personAge = (Integer) ageObject;
-            } else {
-                throw new RuntimeException("Invalid age property type for person with name " + name);
-            }
-            Person person = new Person();
-            person.setName(personName);
-            person.setAge(personAge);
-            System.out.println("Retrieved person with name: " + person.getName() + " and age: " + person.getAge());
-            return person;
-        } else {
-            System.out.println("Person with name " + name + " not found");
-            throw new RuntimeException("Person with name " + name + " not found");
-        }
+        params.put("projectId", project.getId());  // changed 'id' to 'projectId'
+        params.put("name", project.getName());
+        client.submit("g.addV('project').property('projectId', projectId).property('name', name)", params).all().join();
     }
 
+    public void insertInvoice(Invoice invoice) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("invoiceId", invoice.getId());  // changed 'id' to 'invoiceId'
+        params.put("customer", invoice.getCustomer());
+        params.put("amount", invoice.getAmount());
+        client.submit("g.addV('invoice').property('invoiceId', invoiceId).property('customer', customer).property('amount', amount)", params).all().join();
+    }
+
+    public void addRelationshipEmployeeInvoice(String employeeId, String invoiceId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("employeeId", employeeId);
+        params.put("invoiceId", invoiceId);
+        client.submit("g.V().has('employee', 'empId', employeeId).as('a').V().has('invoice', 'invoiceId', invoiceId).addE('issues').from('a')", params).all().join();
+    }
+
+    public void addRelationshipEmployeeProject(String employeeId, String projectId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("employeeId", employeeId);
+        params.put("projectId", projectId);
+        client.submit("g.V().has('employee', 'empId', employeeId).as('a').V().has('project', 'projectId', projectId).addE('worksOn').from('a')", params).all().join();
+    }
 }
+
+
