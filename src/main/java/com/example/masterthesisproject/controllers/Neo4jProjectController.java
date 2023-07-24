@@ -1,8 +1,6 @@
 package com.example.masterthesisproject.controllers;
 
-import com.example.masterthesisproject.entities.Employee;
-import com.example.masterthesisproject.entities.Invoice;
-import com.example.masterthesisproject.entities.Project;
+import com.example.masterthesisproject.entities.*;
 import com.example.masterthesisproject.services.Neo4jService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -83,4 +81,22 @@ public class Neo4jProjectController {
         List<Map<String, Object>> projects = neo4jService.getProject(id);
         return new ResponseEntity<>(projects, HttpStatus.OK);
     }
+
+        @PostMapping("/sobo/{label}")
+        public ResponseEntity<String> addSoBO(@RequestBody SoBO soboObj, @PathVariable String label) {
+            neo4jService.addSoBO(soboObj, label);
+            return new ResponseEntity<>("SoBO object added", HttpStatus.CREATED);
+        }
+    @PostMapping("/create-edge")
+    public ResponseEntity<String> createEdge(@RequestBody CreateRelationshipRequest request) {
+        try {
+            neo4jService.createEdge(request);
+            return ResponseEntity.ok("Relationship created successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to create relationship: " + e.getMessage());
+        }
+    }
+
+
+
 }

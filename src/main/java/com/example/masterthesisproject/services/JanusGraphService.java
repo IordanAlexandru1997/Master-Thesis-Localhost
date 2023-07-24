@@ -23,12 +23,12 @@ public class JanusGraphService {
 
     public JanusGraphService() {
         GryoMapper.Builder builder = GryoMapper.build().addRegistry(JanusGraphIoRegistry.getInstance());
-        MessageSerializer serializer = new GryoMessageSerializerV3d0(builder);
+
 
         Cluster cluster = Cluster.build()
                 .addContactPoint("localhost")
                 .port(8182)
-                .serializer(serializer)
+                .serializer(Serializers.GRAPHBINARY_V1D0)
                 .credentials("janusgraph", "parola")
                 .create();
 
@@ -38,21 +38,21 @@ public class JanusGraphService {
         Map<String, Object> params = new HashMap<>();
         params.put("name", employee.getName());
         params.put("salary", employee.getSalary());
-        params.put("empId", employee.getId());  // changed 'id' to 'empId'
+        params.put("empId", employee.getId());
         params.put("department", employee.getDepartment());
         client.submit("g.addV('employee').property('name', name).property('salary', salary).property('empId', empId).property('department', department)", params).all().join();
     }
 
     public void insertProject(Project project) {
         Map<String, Object> params = new HashMap<>();
-        params.put("projectId", project.getId());  // changed 'id' to 'projectId'
+        params.put("projectId", project.getId());
         params.put("name", project.getName());
         client.submit("g.addV('project').property('projectId', projectId).property('name', name)", params).all().join();
     }
 
     public void insertInvoice(Invoice invoice) {
         Map<String, Object> params = new HashMap<>();
-        params.put("invoiceId", invoice.getId());  // changed 'id' to 'invoiceId'
+        params.put("invoiceId", invoice.getId());
         params.put("customer", invoice.getCustomer());
         params.put("amount", invoice.getAmount());
         client.submit("g.addV('invoice').property('invoiceId', invoiceId).property('customer', customer).property('amount', amount)", params).all().join();

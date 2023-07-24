@@ -177,7 +177,6 @@ public class ArangoDBService {
         }
     }
 
-    // Add a new method to check if a relationship already exists
     public boolean relationshipExists(String employeeKey, String invoiceId) {
         String query = "FOR i IN IssueInvoice FILTER i._key == @key RETURN i";
         Map<String, Object> bindVars = new HashMap<>();

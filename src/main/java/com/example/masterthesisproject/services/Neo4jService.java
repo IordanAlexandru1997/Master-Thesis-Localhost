@@ -1,6 +1,9 @@
 package com.example.masterthesisproject.services;
 
+import com.example.masterthesisproject.entities.CreateRelationshipRequest;
+import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;
+import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.types.Node;
 import org.neo4j.driver.Record;
 
@@ -8,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -128,4 +130,45 @@ public class Neo4jService {
 
         return employees;
     }
+//    Updates from 24.07.2023 meeting SoBO
+public void addSoBO(SoBO soboObj, String label) {
+    try (Session session = driver.session()) {
+        Map<String, Object> properties = soboObj.getProperties();
+
+        StringBuilder queryBuilder = new StringBuilder();
+        queryBuilder.append("CREATE (s:" + label + " {");
+
+        if (properties != null && !properties.isEmpty()) {
+            for (Map.Entry<String, Object> entry : properties.entrySet()) {
+                queryBuilder.append("`").append(entry.getKey()).append("`").append(": $").append(entry.getKey()).append(", ");
+            }
+
+            queryBuilder.delete(queryBuilder.length() - 2, queryBuilder.length());  // remove last comma and space
+        }
+
+        queryBuilder.append("})");
+
+        session.run(queryBuilder.toString(), properties);
+    }
+}
+
+
+
+    public void createEdge(CreateRelationshipRequest request) {
+        try (Session session = driver.session()) {
+            Map<String, Object> properties1 = request.getSoboObj1();
+            Map<String, Object> properties2 = request.getSoboObj2();
+            String matchField = request.getMatchField();
+
+            if (properties1 != null && properties2 != null) {
+                String query = String.format("MATCH (a), (b) WHERE a.%s = $prop1 AND b.%s = $prop2 CREATE (a)-[:RELATES_TO]->(b)",
+                        matchField, matchField);
+                session.run(query, parameters("prop1", properties1.get(matchField), "prop2", properties2.get(matchField)));
+            }
+        }
+    }
+
+
+
+
 }
