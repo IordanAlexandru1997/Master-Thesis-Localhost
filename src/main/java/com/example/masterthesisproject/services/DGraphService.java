@@ -28,7 +28,7 @@ public class DGraphService {
     private DgraphClient dgraphClient;
 
     public DGraphService() {
-        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 9081).usePlaintext().build();
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 9080).usePlaintext().build();
         DgraphGrpc.DgraphStub stub = DgraphGrpc.newStub(channel);
         this.dgraphClient = new DgraphClient(stub);
         createSchema();

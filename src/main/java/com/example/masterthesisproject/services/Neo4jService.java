@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -136,7 +137,7 @@ public void addSoBO(SoBO soboObj, String label) {
         Map<String, Object> properties = soboObj.getProperties();
 
         StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("CREATE (s:" + label + " {");
+        queryBuilder.append("MERGE (s:" + label + " {"); // Change here: CREATE -> MERGE
 
         if (properties != null && !properties.isEmpty()) {
             for (Map.Entry<String, Object> entry : properties.entrySet()) {
@@ -156,17 +157,29 @@ public void addSoBO(SoBO soboObj, String label) {
 
     public void createEdge(CreateRelationshipRequest request) {
         try (Session session = driver.session()) {
-            Map<String, Object> properties1 = request.getSoboObj1();
-            Map<String, Object> properties2 = request.getSoboObj2();
+            Map<String, Object> soboObj1 = request.getSoboObj1();
+            Map<String, Object> soboObj2 = request.getSoboObj2();
             String matchField = request.getMatchField();
+            String soboLabel1 = request.getSoboLabel1();
+            String soboLabel2 = request.getSoboLabel2();
 
-            if (properties1 != null && properties2 != null) {
-                String query = String.format("MATCH (a), (b) WHERE a.%s = $prop1 AND b.%s = $prop2 CREATE (a)-[:RELATES_TO]->(b)",
-                        matchField, matchField);
-                session.run(query, parameters("prop1", properties1.get(matchField), "prop2", properties2.get(matchField)));
+            String query = "MATCH (n:" + soboLabel1 + " {" + matchField + ": $matchValue1 })," +
+                    "(m:" + soboLabel2 + " {" + matchField + ": $matchValue2 }) " +
+                    "MERGE (n)-[r:RELATED_TO]->(m) RETURN type(r)";
+
+            Map<String, Object> params = new HashMap<>();
+            params.put("matchValue1", soboObj1.get(matchField));
+            params.put("matchValue2", soboObj2.get(matchField));
+
+            try {
+                session.run(query, params);
+            } catch (Neo4jException ex) {
+                System.err.println("Error creating edge: " + ex.getMessage());
             }
         }
     }
+
+
 
 
 
