@@ -1,5 +1,6 @@
 package com.example.masterthesisproject.services;
 
+import com.example.masterthesisproject.entities.CreateRelationshipRequest;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;

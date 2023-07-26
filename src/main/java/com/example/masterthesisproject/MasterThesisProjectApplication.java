@@ -1,5 +1,6 @@
 package com.example.masterthesisproject;
 
+import com.example.masterthesisproject.entities.CreateRelationshipRequest;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import com.example.masterthesisproject.services.Neo4jService;
