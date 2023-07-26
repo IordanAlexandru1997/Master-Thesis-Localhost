@@ -1,0 +1,23 @@
+
+
+
+//        Neo4jService neo4jService = context.getBean(Neo4jService.class);
+//
+//        SoBO sobo1 = new SoBO();
+//        sobo1.addProperty("id", "1236");
+//        sobo1.addProperty("name", "Bula Mariusoi");
+//        sobo1.addProperty("email", "lapu@gmail.com");
+//        neo4jService.addSoBO(sobo1, "id");
+//
+//        SoBO sobo2 = new SoBO();
+//        sobo2.addProperty("id", "1235");
+//        sobo2.addProperty("name", "Covrig Andreioi");
+//        sobo2.addProperty("email", "mail@gmail.com");
+//        neo4jService.addSoBO(sobo2, "id");
+//
+//        Map<String, Object> edgeProperties = new HashMap<>();
+//        edgeProperties.put("some thing", "some value");
+//        edgeProperties.put("property2", 42);
+//        Edge edge = new Edge(sobo1, sobo2, "RELATED_TO", edgeProperties);
+//
+//        neo4jService.createEdge(edge, "id");
