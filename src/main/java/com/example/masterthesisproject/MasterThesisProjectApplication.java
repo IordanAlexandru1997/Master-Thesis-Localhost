@@ -1,6 +1,6 @@
 package com.example.masterthesisproject;
 
-import com.example.masterthesisproject.entities.CreateRelationshipRequest;
+//import com.example.masterthesisproject.entities.CreateRelationshipRequest;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import com.example.masterthesisproject.services.Neo4jService;
@@ -19,9 +19,9 @@ public class MasterThesisProjectApplication {
         Neo4jService neo4jService = context.getBean(Neo4jService.class);
 
         SoBO sobo1 = new SoBO();
-        sobo1.addProperty("id", "1234");
-        sobo1.addProperty("name", "Papusoi Mariusoi");
-        sobo1.addProperty("email", "mail@gmail.com");
+        sobo1.addProperty("id", "1236");
+        sobo1.addProperty("name", "Bula Mariusoi");
+        sobo1.addProperty("email", "lapu@gmail.com");
         neo4jService.addSoBO(sobo1, "id");
 
         SoBO sobo2 = new SoBO();
@@ -31,7 +31,7 @@ public class MasterThesisProjectApplication {
         neo4jService.addSoBO(sobo2, "id");
 
         Map<String, Object> edgeProperties = new HashMap<>();
-        edgeProperties.put("property1", "value1");
+        edgeProperties.put("some thing", "some value");
         edgeProperties.put("property2", 42);
         Edge edge = new Edge(sobo1, sobo2, "RELATED_TO", edgeProperties);
 
