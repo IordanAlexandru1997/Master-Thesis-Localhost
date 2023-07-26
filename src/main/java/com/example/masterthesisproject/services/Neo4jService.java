@@ -1,6 +1,7 @@
 package com.example.masterthesisproject.services;
 
 import com.example.masterthesisproject.entities.CreateRelationshipRequest;
+import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;
 import org.neo4j.driver.exceptions.Neo4jException;
@@ -132,56 +133,37 @@ public class Neo4jService {
         return employees;
     }
 //    Updates from 24.07.2023 meeting SoBO
-public void addSoBO(SoBO soboObj, String label) {
-    try (Session session = driver.session()) {
-        Map<String, Object> properties = soboObj.getProperties();
 
-        StringBuilder queryBuilder = new StringBuilder();
-        queryBuilder.append("MERGE (s:" + label + " {"); // Change here: CREATE -> MERGE
-
-        if (properties != null && !properties.isEmpty()) {
-            for (Map.Entry<String, Object> entry : properties.entrySet()) {
-                queryBuilder.append("`").append(entry.getKey()).append("`").append(": $").append(entry.getKey()).append(", ");
-            }
-
-            queryBuilder.delete(queryBuilder.length() - 2, queryBuilder.length());  // remove last comma and space
-        }
-
-        queryBuilder.append("})");
-
-        session.run(queryBuilder.toString(), properties);
-    }
-}
-
-
-
-    public void createEdge(CreateRelationshipRequest request) {
+    public void addSoBO(SoBO soboObj, String uniqueField) {
         try (Session session = driver.session()) {
-            Map<String, Object> soboObj1 = request.getSoboObj1();
-            Map<String, Object> soboObj2 = request.getSoboObj2();
-            String matchField = request.getMatchField();
-            String soboLabel1 = request.getSoboLabel1();
-            String soboLabel2 = request.getSoboLabel2();
+            Map<String, Object> properties = soboObj.getProperties();
+            StringBuilder queryBuilder = new StringBuilder();
+            queryBuilder.append("MERGE (s {");
+            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
+            queryBuilder.append("}) SET s += $properties");
 
-            String query = "MATCH (n:" + soboLabel1 + " {" + matchField + ": $matchValue1 })," +
-                    "(m:" + soboLabel2 + " {" + matchField + ": $matchValue2 }) " +
-                    "MERGE (n)-[r:RELATED_TO]->(m) RETURN type(r)";
+            session.run(queryBuilder.toString(), parameters("properties", properties, uniqueField, properties.get(uniqueField)));
+        }
+    }
+
+    public void createEdge(Edge edge, String uniqueField) {
+        try (Session session = driver.session()) {
+            SoBO soboObj1 = edge.getSoboObj1();
+            SoBO soboObj2 = edge.getSoboObj2();
+
+            StringBuilder queryBuilder = new StringBuilder();
+
+            queryBuilder.append("MATCH (n {").append("`").append(uniqueField).append("`").append(": $").append("value1}), ");
+            queryBuilder.append("(m {").append("`").append(uniqueField).append("`").append(": $").append("value2}) ");
+            queryBuilder.append("MERGE (n)-[r:").append(edge.getType()).append("]->(m) SET r += $properties");
 
             Map<String, Object> params = new HashMap<>();
-            params.put("matchValue1", soboObj1.get(matchField));
-            params.put("matchValue2", soboObj2.get(matchField));
+            params.put("value1", soboObj1.getProperties().get(uniqueField));
+            params.put("value2", soboObj2.getProperties().get(uniqueField));
+            params.put("properties", edge.getProperties());
 
-            try {
-                session.run(query, params);
-            } catch (Neo4jException ex) {
-                System.err.println("Error creating edge: " + ex.getMessage());
-            }
+            session.run(queryBuilder.toString(), params);
         }
     }
-
-
-
-
-
-
 }
+
