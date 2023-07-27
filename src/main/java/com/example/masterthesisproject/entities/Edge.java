@@ -14,7 +14,12 @@ public class Edge {
         this.type = type;
         this.properties = properties;
     }
-
+    public Edge(SoBO soboObj1, SoBO soboObj2, String type) {
+        this.soboObj1 = soboObj1;
+        this.soboObj2 = soboObj2;
+        this.type = type;
+        this.properties= null;
+    }
     public SoBO getSoboObj1() {
         return soboObj1;
     }

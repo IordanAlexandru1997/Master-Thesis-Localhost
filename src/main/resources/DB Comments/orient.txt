@@ -1,0 +1,130 @@
+Need to manually create the class before creating the vertex.  Also, the class V is by default the vertice class which is a superclass
+The issue here is that OrientDB does not support MERGE directly as Neo4j does. You have to manually check if the vertex or edge exists before creation.
+
+
+
+
+    public void addSoBO(SoBO sobo, String idPropertyName) {
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
+            OResultSet rs = db.query(query, sobo.getId());
+            OVertex soboVertex;
+            if (rs.hasNext()) {
+                soboVertex = rs.next().getVertex().get();
+            } else {
+                if (db.getClass("SoBO") == null) {
+                    OClass soboClass = db.createClass("SoBO");
+                    soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, idPropertyName);
+                }
+                soboVertex = db.newVertex("SoBO");
+            }
+            soboVertex.setProperty(idPropertyName, sobo.getId());
+            for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
+                soboVertex.setProperty(property.getKey(), property.getValue());
+            }
+            soboVertex.save();
+            db.commit();
+        }
+    }
+    public void createEdge(Edge edge, String id) {
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            // Get the vertices for soboObj1 and soboObj2
+            OVertex sobo1Vertex = getOrCreateVertex(db, edge.getSoboObj1());
+            OVertex sobo2Vertex = getOrCreateVertex(db, edge.getSoboObj2());
+            // Check if the edge already exists
+            OEdge existingEdge = null;
+            try (OResultSet rs = db.query(
+                    "SELECT FROM (TRAVERSE bothE() FROM ?) WHERE @class = ? AND in.@rid = ? AND out.@rid = ?",
+                    sobo1Vertex.getIdentity(), edge.getType(), sobo2Vertex.getIdentity(), sobo1Vertex.getIdentity())) {
+                if (rs.hasNext()) {
+                    existingEdge = rs.next().getEdge().get();
+                }
+            }
+            // If the edge doesn't exist, create a new one
+            if (existingEdge == null) {
+                existingEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
+            }
+            // Update the properties whether it's an existing or new edge
+            for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
+                existingEdge.setProperty(entry.getKey(), entry.getValue());
+            }
+            existingEdge.save();
+        }
+    }
+    private OVertex getOrCreateVertex(ODatabaseSession db, SoBO sobo) {
+        OVertex vertex;
+        Object id = sobo.getProperties().get("id");
+
+        if (id == null) {
+            throw new IllegalArgumentException("SoBO id cannot be null");
+        }
+
+        try (OResultSet rs = db.query("SELECT FROM SoBO WHERE id = ?", id)) {
+            if (rs.hasNext()) {
+                vertex = rs.next().getVertex().get();
+            } else {
+                vertex = db.newVertex("SoBO");
+                for (Map.Entry<String, Object> entry : sobo.getProperties().entrySet()) {
+                    vertex.setProperty(entry.getKey(), entry.getValue());
+                }
+                vertex.save();
+            }
+        }
+
+        return vertex;
+    }
+
+
+
+
+   public void addSoBO(SoBO sobo, String idPropertyName) {
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+
+            if (db.getClass("SoBO") == null) {
+                OClass soboClass = db.createClass("SoBO", "V"); // Change made here
+            }
+            OVertex soboVertex = db.newVertex("V");
+            soboVertex.setProperty("type", "SoBO");
+            soboVertex.setProperty(idPropertyName, sobo.getId());
+            for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
+                soboVertex.setProperty(property.getKey(), property.getValue());
+            }
+            soboVertex.save();
+            db.commit();
+        }
+    }
+
+
+        public static void main(String[] args) {
+            ConfigurableApplicationContext context = SpringApplication.run(MasterThesisProjectApplication.class, args);
+    //        Neo4jService neo4jService = context.getBean(Neo4jService.class);
+            OrientDBService orientDBService = context.getBean(OrientDBService.class);
+            SoBO sobo1 = new SoBO();
+            sobo1.addProperty("id", "1224");
+            sobo1.addProperty("name", "Gagica ");
+            sobo1.addProperty("email", "mail@gmail.com");
+    //        neo4jService.addSoBO(sobo1, "id");
+
+            SoBO sobo2 = new SoBO();
+            sobo2.addProperty("id", "1237");
+            sobo2.addProperty("name", "Marius");
+            sobo2.addProperty("email", "mail@gmail.com");
+            sobo2.addProperty("yahoo", "madal@gmail.com");
+            sobo2.addProperty("outlook", "maadadal@gmail.com");
+    //        neo4jService.addSoBO(sobo2, "id");
+
+            Map<String, Object> edgeProperties = new HashMap<>();
+            edgeProperties.put("property1", "value1");
+            edgeProperties.put("property2", 42);
+            Edge edge = new Edge(sobo1, sobo2, "RELATED_TO", edgeProperties);
+
+    //        neo4jService.createEdge(edge, "id");
+
+            orientDBService.addSoBO(sobo1, "id");
+            orientDBService.addSoBO(sobo2, "id");
+            orientDBService.createEdge(edge, "id");
+        }
+
