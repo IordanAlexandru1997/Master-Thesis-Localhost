@@ -8,19 +8,30 @@ import java.util.Map;
 public class SoBO {
     private String id;
     private Map<String, Object> properties = new HashMap<>();
+    private List<String> idKeys;
+
     public SoBO() {
     }
-    public SoBO(List<String> ids) {
-        this.properties = new HashMap<>();
-        String uniqueId = "";
-        for(String id : ids) {
-            uniqueId += properties.get(id);
-        }
-        this.properties.put("id", uniqueId);
+
+    public SoBO(List<String> idKeys) {
+        this.idKeys = idKeys;
     }
 
     public void addProperty(String key, Object value) {
         this.properties.put(key, value);
+        if (idKeys.contains(key)) {
+            updateId();
+        }
+    }
+
+    private void updateId() {
+        StringBuilder newId = new StringBuilder();
+        for (String key : idKeys) {
+            if (properties.containsKey(key)) {
+                newId.append(properties.get(key));
+            }
+        }
+        setId(newId.toString());
     }
 
     public Map<String, Object> getProperties() {
@@ -33,6 +44,7 @@ public class SoBO {
 
     public void setId(String id) {
         this.id = id;
+        this.properties.put("id", id);
     }
 
     @JsonAnySetter
@@ -40,3 +52,4 @@ public class SoBO {
         addProperty(name, value);
     }
 }
+

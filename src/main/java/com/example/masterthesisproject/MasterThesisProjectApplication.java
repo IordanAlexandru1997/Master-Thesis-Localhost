@@ -9,7 +9,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @SpringBootApplication
@@ -21,31 +23,34 @@ public class MasterThesisProjectApplication {
 //        OrientDBService orientDBService = context.getBean(OrientDBService.class);
 //        ArangoDBService arangoDBService = context.getBean(ArangoDBService.class);
 
-        SoBO sobo1 = new SoBO();
-
-        sobo1.addProperty("id", "1226");
+        List<String> idKeys1 = Arrays.asList("name", "email");
+        SoBO sobo1 = new SoBO(idKeys1);
         sobo1.addProperty("name", "Popa Maricica");
         sobo1.addProperty("email", "mail@gmail.com");
 
-
-        SoBO sobo2 = new SoBO();
-        sobo2.addProperty("id", "1238");
+        List<String> idKeys2 = Arrays.asList("email");
+        SoBO sobo2 = new SoBO(idKeys2);
         sobo2.addProperty("name", "Marius");
         sobo2.addProperty("email", "mail@gmail.com");
         sobo2.addProperty("yahoo", "madal@gmail.com");
-        sobo2.addProperty("outlook", "maadadal@gmail.com");
 
-        SoBO sobo3 = new SoBO();
-        sobo3.addProperty("id", "1239");
+        List<String> idKeys3 = Arrays.asList("name", "age");
+        SoBO sobo3 = new SoBO(idKeys3);
         sobo3.addProperty("name", "Marius");
         sobo3.addProperty("age", "26");
         sobo3.addProperty("outlook", "maadadal@gmail.com");
+
+        System.out.println(sobo1.getId());
+        System.out.println(sobo2.getId());
+        System.out.println(sobo3.getId());
+
 
         Map<String, Object> edgeProperties = new HashMap<>();
         edgeProperties.put("id", "value1");
         edgeProperties.put("id2", 42);
         Edge edge1 = new Edge(sobo1, sobo2, "RELATED_TO", edgeProperties);
         Edge edge2 = new Edge(sobo2, sobo3, "RELATED_TO");
+
 
 //        neo4jService.createEdge(edge, "id");
 
