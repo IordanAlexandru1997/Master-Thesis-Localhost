@@ -71,6 +71,9 @@ public class MasterThesisProjectApplication {
 //        arangoDBService.createEdge(edge2, "RELATED_TO");
         neo4jService.createEdge(edge1, "id");
         neo4jService.createEdge(edge2, "id");
+        DatabaseBenchmark neo4jBenchmark = new DatabaseBenchmark(neo4jService, 1000);
+        neo4jBenchmark.runBenchmark(20, 50, 20, 10);
+
     }
 
 }

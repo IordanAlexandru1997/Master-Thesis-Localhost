@@ -1,5 +1,7 @@
 package com.example.masterthesisproject.services;
 
+import com.example.masterthesisproject.DatabaseService;
+import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;
@@ -15,10 +17,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.example.masterthesisproject.SoBOGenerator.*;
 import static org.neo4j.driver.Values.parameters;
 
 @Service
-public class Neo4jService {
+public class Neo4jService implements DatabaseService {
 
     private final String NEO4J_URL = "bolt://localhost:7687";
     private final String USERNAME = "neo4j";
@@ -29,109 +32,8 @@ public class Neo4jService {
     public void init() {
         driver = GraphDatabase.driver(NEO4J_URL, AuthTokens.basic(USERNAME, PASSWORD));
     }
-
-    public void createRelationships(String employeeName, String projectName, double invoiceAmount) {
-        try (Session session = driver.session()) {
-            // Ensure Employee, Project, and Invoice nodes exist
-            session.run("MERGE (e:Employee {name: $employeeName}) " +
-                            "MERGE (p:Project {name: $projectName}) " +
-                            "MERGE (i:Invoice {amount: $invoiceAmount})",
-                    parameters("employeeName", employeeName,
-                            "projectName", projectName,
-                            "invoiceAmount", invoiceAmount));
-
-            // Create relationships
-            session.run("MATCH (e:Employee {name: $employeeName}), (p:Project {name: $projectName}), (i:Invoice {amount: $invoiceAmount}) " +
-                            "MERGE (e)-[:WORKS_FOR]->(p) " +
-                            "MERGE (e)-[:ISSUED]->(i)",
-                    parameters("employeeName", employeeName,
-                            "projectName", projectName,
-                            "invoiceAmount", invoiceAmount));
-        }
-    }
-    public void createRelationshipWithoutInvoice(String employeeName, String projectName) {
-        try (Session session = driver.session()) {
-
-            session.run("MERGE (e:Employee {name: $employeeName}) " +
-                            "MERGE (p:Project {name: $projectName}) ",
-                    parameters("employeeName", employeeName,
-                            "projectName", projectName));
-
-            // Create relationship
-            session.run("MATCH (e:Employee {name: $employeeName}), (p:Project {name: $projectName})" +
-                            "MERGE (e)-[:WORKS_FOR]->(p) ",
-                    parameters("employeeName", employeeName,
-                            "projectName", projectName));
-        }
-    }
-
-    public List<Map<String, Object>> getEmployeeByName(String name) {
-        try (Session session = driver.session()) {
-            return session.run("MATCH (e:Employee {name: $name}) RETURN e", Map.of("name", name))
-                    .list(r -> r.get("e").asMap());
-        }
-    }
-
-    public void createEmployee(String name, double salary, String id, String department) {
-        try (Session session = driver.session()) {
-            String query = "CREATE (e:Employee {name: $name, salary: $salary, id: $id, department: $department})";
-            session.run(query, parameters("name", name, "salary", salary, "id", id, "department", department));
-        }
-    }
-
-    public void createInvoice(String id, String customer, double amount) {
-        try (Session session = driver.session()) {
-            String query = "CREATE (i:Invoice {id: $id, customer: $customer, amount: $amount})";
-            session.run(query, parameters("id", id, "customer", customer, "amount", amount));
-        }
-    }
-
-    public void createProject(String id, String name) {
-        try (Session session = driver.session()) {
-            session.run("CREATE (p:Project {id: $id, name: $name})",
-                    Map.of("id", id, "name", name));
-        }
-    }
-
-    public List<Map<String, Object>> getEmployee(String name) {
-        try (Session session = driver.session()) {
-            String query = "MATCH (e:Employee {name: $name}) RETURN e";
-            return session.readTransaction(tx -> tx.run(query, parameters("name", name)).list(r -> r.get("e").asNode().asMap()));
-        }
-    }
-
-
-    public List<Map<String, Object>> getInvoice(String id) {
-        try (Session session = driver.session()) {
-            String query = "MATCH (i:Invoice {id: $id}) RETURN i";
-            return session.readTransaction(tx -> tx.run(query, parameters("id", id)).list(r -> r.get("e").asNode().asMap()));
-        }
-    }
-
-    public List<Map<String, Object>> getProject(String id) {
-        try (Session session = driver.session()) {
-            return session.run("MATCH (p:Project {id: $id}) RETURN p", Map.of("id", id))
-                    .list(r -> r.get("p").asMap());
-        }
-    }
-
-    public List<Node> getEmployeesByName(String name) {
-        List<Node> employees = new ArrayList<>();
-
-        try (Session session = driver.session()) {
-
-            String query = "MATCH (n:Employee) WHERE n.name = $name RETURN n";
-            Result result = session.run(query, parameters("name", name));
-
-            while (result.hasNext()) {
-                Record record = result.next();
-                employees.add(record.get("n").asNode());
-            }
-        }
-
-        return employees;
-    }
 //    Updates from 24.07.2023 meeting SoBO
+
 
     public void addSoBO(SoBO soboObj, String uniqueField) {
         try (Session session = driver.session()) {
@@ -163,6 +65,97 @@ public class Neo4jService {
 
             session.run(queryBuilder.toString(), params);
         }
+    }
+    public void updateSoBO(SoBO soboObj, String uniqueField) {
+        try (Session session = driver.session()) {
+            Map<String, Object> properties = soboObj.getProperties();
+            StringBuilder queryBuilder = new StringBuilder();
+
+            queryBuilder.append("MATCH (s {");
+            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
+            queryBuilder.append("}) SET s += $properties");
+
+            session.run(queryBuilder.toString(), parameters("properties", properties, uniqueField, properties.get(uniqueField)));
+        }
+    }
+
+    public void deleteSoBO(String soboId, String uniqueField) {
+        try (Session session = driver.session()) {
+            StringBuilder queryBuilder = new StringBuilder();
+
+            queryBuilder.append("MATCH (s {");
+            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
+            queryBuilder.append("}) DETACH DELETE s");
+
+            session.run(queryBuilder.toString(), parameters(uniqueField, soboId));
+        }
+    }
+
+    public SoBO getSoBO(String soboId, String uniqueField) {
+        try (Session session = driver.session()) {
+            StringBuilder queryBuilder = new StringBuilder();
+
+            queryBuilder.append("MATCH (s {");
+            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
+            queryBuilder.append("}) RETURN s");
+
+            List<Record> records = session.run(queryBuilder.toString(), parameters(uniqueField, soboId)).list();
+
+            if (!records.isEmpty()) {
+                Record record = records.get(0);
+                Node node = record.get("s").asNode();
+                SoBO sobo = new SoBO();
+                sobo.setId(node.get("id").asString());
+                Map<String, Object> properties = new HashMap<>();
+                for (String key : node.keys()) {
+                    properties.put(key, node.get(key).asObject());
+                }
+                sobo.getProperties().putAll(properties);
+
+                return sobo;
+            }
+
+            return null;
+        }
+    }
+
+
+
+
+    @Override
+    public void create() {
+        // Use addSoBO method to create a SoBO object twice to ensure at least two SoBO objects
+        SoBO sobo1 = generateRandomSoBO(); // Assumes you have a method to generate a random SoBO object
+        addSoBO(sobo1, "id");
+
+        SoBO sobo2 = generateRandomSoBO(); // Assumes you have a method to generate a random SoBO object
+        addSoBO(sobo2, "id");
+
+        // Use createEdge method to create an edge
+        Edge edge = generateRandomEdge(); // Assumes you have a method to generate a random Edge
+        createEdge(edge, "id");
+    }
+
+    @Override
+    public void read() {
+        // Use getSoBO method to read a SoBO object
+        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
+        getSoBO(sobo.getId(), "id");
+    }
+
+    @Override
+    public void update() {
+        // Use updateSoBO method to update a SoBO object
+        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
+        sobo.addProperty("someProperty", "newValue"); // Update some property of the SoBO object
+        updateSoBO(sobo, "id");
+    }
+
+    @Override
+    public void delete() {
+        // Use deleteSoBO method to delete a SoBO object
+        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
+        deleteSoBO(sobo.getId(), "id");
     }
 }
 

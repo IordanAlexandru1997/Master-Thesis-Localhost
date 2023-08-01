@@ -1,5 +1,6 @@
 package com.example.masterthesisproject.entities;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class Edge {
@@ -18,7 +19,7 @@ public class Edge {
         this.soboObj1 = soboObj1;
         this.soboObj2 = soboObj2;
         this.type = type;
-        this.properties= null;
+        this.properties= new HashMap<>();
     }
     public SoBO getSoboObj1() {
         return soboObj1;
