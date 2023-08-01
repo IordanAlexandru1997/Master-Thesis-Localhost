@@ -1,4 +1,13 @@
-
+        // Adding SoBO objects : id between email and firstname "alex@gmail.comalex". own id between different properties
+        // metadata on how the id is being formed (in a list): {id, email, firstname}. Merge operation also possible. without destroying the obj.
+        // Performing benchmark only between java api and database servers.
+        // 1. Create 1000 SoBO objects with 10 properties each.
+        // 2. Updating 1000 SoBO objects with 10 properties each using id.
+        // Creating a sequence of CRUD operations and performing them on each database. (Most operations would be an update with nothing to update)
+        // Creation template: 100% of creates, 0% of updates, 0% of deletes, 0% of reads.
+        // Update template. This could be a randomized sequence of operations. (CRUD). 90% of update ( 80% nothing happens,  10%or an actual update happens), 20% of deletes, 40% of creates, 10% of reads.
+        // Reading template. 100% of reads, 0% of updates, 0% of deletes, 0% of creates.
+        // Mixed template. 50% of reads, 20% of updates, 20% of creates, 10% of deletes.
 
 
 //        Neo4jService neo4jService = context.getBean(Neo4jService.class);

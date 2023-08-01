@@ -1,4 +1,6 @@
 package com.example.masterthesisproject.services;
+import com.arangodb.ArangoDBException;
+import com.arangodb.entity.BaseEdgeDocument;
 import com.arangodb.entity.CollectionEntity;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
@@ -6,9 +8,7 @@ import com.arangodb.entity.CollectionType;
 import com.arangodb.ArangoDB;
 import com.arangodb.ArangoDatabase;
 import com.arangodb.entity.BaseDocument;
-import com.example.masterthesisproject.entities.Employee;
-import com.example.masterthesisproject.entities.Invoice;
-import com.example.masterthesisproject.entities.Project;
+import com.example.masterthesisproject.entities.*;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -36,151 +36,75 @@ public class ArangoDBService {
         database = arangoDB.db(DB_NAME);
     }
 
-    public void createRelationships(String employeeName, String projectName) {
-        String employeeKey;
-        Employee employee = getEmployee(employeeName);
-        if (employee != null) {
-            employeeKey = employee.getId();
-        } else {
-            throw new RuntimeException("Employee not found: " + employeeName);
+    public void addSoBO(SoBO sobo, String keyAttr) {
+        // Get key from sobo properties
+        String key = String.valueOf(sobo.getProperties().get(keyAttr));
+        if (key == null) {
+            throw new RuntimeException("Key attribute: " + keyAttr + " not found in SoBO properties.");
         }
 
-        String projectKey;
-        Project project = getProjectByName(projectName);
-        if (project != null) {
-            projectKey = project.getId();
-        } else {
-            throw new RuntimeException("Project not found: " + projectName);
+        // Create the collection if it doesn't exist
+        if (!database.collection("SoBO").exists()) {
+            CollectionCreateOptions options = new CollectionCreateOptions();
+            options.type(CollectionType.DOCUMENT);
+            database.createCollection("SoBO", options);
         }
 
-        // Create the Edge collection if it doesn't exist
-        if (!database.collection("WorksOn").exists()) {
+        // Define a document
+        BaseDocument soboDoc = new BaseDocument(key);
+        soboDoc.setProperties(sobo.getProperties());
+        BaseDocument existingDoc = database.collection("SoBO").getDocument(key, BaseDocument.class);
+        if (existingDoc != null) {
+            database.collection("SoBO").updateDocument(key, soboDoc);
+        } else {
+            database.collection("SoBO").insertDocument(soboDoc);
+        }
+        // Throw an exception if the document could not be created
+        if (database.collection("SoBO").getDocument(key, BaseDocument.class) == null) {
+            throw new RuntimeException("Could not create SoBO document with key: " + key);
+        }
+        // Check if document exists and update or insert accordingly
+        if (database.collection("SoBO").getDocument(key, BaseDocument.class) != null) {
+            database.collection("SoBO").updateDocument(key, soboDoc);
+        } else {
+            database.collection("SoBO").insertDocument(soboDoc);
+        }
+    }
+    public void createEdge(Edge edge, String edgeCollectionName) {
+        // Check if Edge collection exists and create it if not
+        if (!database.collection(edgeCollectionName).exists()) {
             CollectionCreateOptions options = new CollectionCreateOptions();
             options.type(CollectionType.EDGES);
-            CollectionEntity collection = database.createCollection("WorksOn", options);
+            database.createCollection(edgeCollectionName, options);
         }
 
-        // Define an edge document
-        BaseDocument worksOnEdge = new BaseDocument();
-        String edgeKey = employeeKey + "_works_on_" + projectKey;
-        if (relationshipExists(employeeKey, projectKey)) {
-            worksOnEdge.setKey(edgeKey); // unique key for this relationship
-            worksOnEdge.addAttribute("_from", "Employee/" + employeeKey); // the '_from' attribute points to the employee
-            worksOnEdge.addAttribute("_to", "Project/" + projectKey); // the '_to' attribute points to the project
+        // Create Edge document
+        String edgeKey = UUID.randomUUID().toString();
+        System.out.println("Generated edgeKey: " + edgeKey);  // Log the generated edgeKey
 
-            // Save the edge document in the "WorksOn" collection
-            database.collection("WorksOn").insertDocument(worksOnEdge);
+        String id1 = (String) edge.getSoboObj1().getProperties().get("id");
+        String id2 = (String) edge.getSoboObj2().getProperties().get("id");
+
+        Map<String, Object> properties = edge.getProperties();
+        if(properties == null) {
+            properties = new HashMap<>();
+        }
+        BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
+        edgeDoc.setKey(edgeKey);
+        edgeDoc.setProperties(properties);
+
+        BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
+        if (existingEdge != null) {
+            System.out.println("Edge with edgeKey already exists, updating: " + edgeKey);
+            database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
         } else {
-            throw new RuntimeException("Relationship already exists: " + edgeKey);
-        }
-    }
-
-
-    public Project getProjectByName(String name) {
-        String query = "FOR p IN Project FILTER p.name == @name RETURN p";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("name", name);
-        return database.query(query, bindVars, null, Project.class).first();
-    }
-
-    public void createRelationshipWithoutInvoice(String employeeName, String projectName) {
-        BaseDocument employee = new BaseDocument();
-        employee.addAttribute("name", employeeName);
-        database.collection("Employee").insertDocument(employee);
-
-        BaseDocument project = new BaseDocument();
-        project.addAttribute("name", projectName);
-        database.collection("Project").insertDocument(project);
-
-          }
-
-    public Employee getEmployee(String name) {
-        String query = "FOR e IN Employee FILTER e.name == @name RETURN e";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("name", name);
-        return database.query(query, bindVars, null, Employee.class).first();
-    }
-    public void createEmployee(Employee employee) {
-        BaseDocument baseEmployee = new BaseDocument(employee.getName());
-        baseEmployee.addAttribute("name", employee.getName());
-        baseEmployee.addAttribute("salary", employee.getSalary());
-        baseEmployee.addAttribute("department", employee.getDepartment());
-        database.collection("Employee").insertDocument(baseEmployee);
-    }
-    public void createInvoice(Invoice invoice) {
-        BaseDocument baseInvoice = new BaseDocument(invoice.getId());
-        baseInvoice.addAttribute("customer", invoice.getCustomer());
-        baseInvoice.addAttribute("amount", invoice.getAmount());
-        database.collection("Invoice").insertDocument(baseInvoice);
-    }
-
-    public void createProject(Project project) {
-        BaseDocument baseProject = new BaseDocument(project.getName());
-        baseProject.addAttribute("name", project.getName());
-        database.collection("Project").insertDocument(baseProject);
-    }
-    public Invoice getInvoice(String id) {
-        String query = "FOR i IN Invoice FILTER i._key == @id RETURN i";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("id", id);
-        return database.query(query, bindVars, null, Invoice.class).first();
-    }
-    public Project getProject(String id) {
-        String query = "FOR p IN Project FILTER p._key == @id RETURN p";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("id", id);
-        return database.query(query, bindVars, null, Project.class).first();
-    }
-
-    public List<Employee> getEmployeesByName(String name) {
-        String query = "FOR e IN Employee FILTER e.name == @name RETURN e";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("name", name);
-        return database.query(query, bindVars, null, Employee.class).asListRemaining();
-    }
-
-
-    public void createInvoiceAndRelationship(String employeeName, Invoice invoice) {
-        String employeeKey;
-        Employee employee = getEmployee(employeeName);
-        if (employee != null) {
-            employeeKey = employee.getId();
-        } else {
-            throw new RuntimeException("Employee not found: " + employeeName);
+            System.out.println("Creating new Edge with edgeKey: " + edgeKey);
+            database.collection(edgeCollectionName).insertDocument(edgeDoc);
         }
 
-        // Create the Invoice document
-        BaseDocument baseInvoice = new BaseDocument(invoice.getId());
-        baseInvoice.addAttribute("customer", invoice.getCustomer());
-        baseInvoice.addAttribute("amount", invoice.getAmount());
-        database.collection("Invoice").insertDocument(baseInvoice);
-
-        // Create the Edge collection if it doesn't exist
-        if (!database.collection("IssueInvoice").exists()) {
-            CollectionCreateOptions options = new CollectionCreateOptions();
-            options.type(CollectionType.EDGES);
-            CollectionEntity collection = database.createCollection("IssueInvoice", options);
+        // Throw an exception if the edge could not be created
+        if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
+            throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
-
-        // Define an edge document
-        BaseDocument issueInvoiceEdge = new BaseDocument();
-        String edgeKey = employeeKey + "_issues_invoice_" + invoice.getId();
-        if (relationshipExists(employeeKey, invoice.getId())) {
-            issueInvoiceEdge.setKey(edgeKey); // unique key for this relationship
-            issueInvoiceEdge.addAttribute("_from", "Employee/" + employeeKey); // the '_from' attribute points to the employee
-            issueInvoiceEdge.addAttribute("_to", "Invoice/" + invoice.getId()); // the '_to' attribute points to the invoice
-
-            // Save the edge document in the "IssueInvoice" collection
-            database.collection("IssueInvoice").insertDocument(issueInvoiceEdge);
-        } else {
-            throw new RuntimeException("Relationship already exists: " + edgeKey);
-        }
-    }
-
-    public boolean relationshipExists(String employeeKey, String invoiceId) {
-        String query = "FOR i IN IssueInvoice FILTER i._key == @key RETURN i";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("key", employeeKey + "_issues_invoice_" + invoiceId);
-        return database.query(query, bindVars, null, BaseDocument.class).first() == null;
     }
 }
