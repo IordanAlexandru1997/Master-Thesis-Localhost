@@ -14,22 +14,34 @@ public class SoBOGenerator {
     private static final List<SoBO> GENERATED_SoBOs = new ArrayList<>();
 
     public static SoBO generateRandomSoBO() {
-        String id = UUID.randomUUID().toString(); // Generate a unique ID here
-        SoBO sobo = new SoBO(id);
+        List<String> idKeys = new ArrayList<>(KEY_NAMES.subList(0, RANDOM.nextInt(KEY_NAMES.size()) + 1));
+        SoBO sobo = new SoBO(idKeys);
+
+        for (String key : idKeys) {
+            Object value = getRandomValue();
+            sobo.addProperty(key, value);
+        }
+
+        sobo.addProperty("age", RANDOM.nextInt(100));
+        sobo.addProperty("isActive", RANDOM.nextBoolean());
+
         GENERATED_SoBOs.add(sobo);
         return sobo;
-
-        // this works for neo4j.
-//        List<String> idKeys = new ArrayList<>(KEY_NAMES.subList(0, RANDOM.nextInt(KEY_NAMES.size()) + 1));
-//        SoBO sobo = new SoBO(idKeys);
-//
-//        for (String key : idKeys) {
-//            sobo.addProperty(key, UUID.randomUUID().toString());
-//        }
-//
-//        GENERATED_SoBOs.add(sobo);
-//        return sobo;
     }
+
+    private static Object getRandomValue() {
+        int type = RANDOM.nextInt(3);
+        switch (type) {
+            case 0:
+                return UUID.randomUUID().toString();
+            case 1:
+                return RANDOM.nextInt(1000);
+            case 2:
+                return RANDOM.nextBoolean();
+        }
+        return null;
+    }
+
 
     public static Edge generateRandomEdge() {
         if (GENERATED_SoBOs.size() < 2) {
@@ -40,7 +52,7 @@ public class SoBOGenerator {
         SoBO sobo2 = null;
         do {
             sobo2 = getRandomSoBO();
-        } while (sobo2.getId().equals(sobo1.getId())); // Ensure the two SoBOs are different
+        } while (sobo2.getId().equals(sobo1.getId())); // the two SoBOs are different
 
         String edgeType = EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size()));
 

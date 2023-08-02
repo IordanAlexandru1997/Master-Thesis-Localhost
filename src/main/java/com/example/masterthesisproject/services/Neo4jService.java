@@ -125,14 +125,14 @@ public class Neo4jService implements DatabaseService {
     @Override
     public void create() {
         // Use addSoBO method to create a SoBO object twice to ensure at least two SoBO objects
-        SoBO sobo1 = generateRandomSoBO(); // Assumes you have a method to generate a random SoBO object
+        SoBO sobo1 = generateRandomSoBO();
         addSoBO(sobo1, "id");
 
-        SoBO sobo2 = generateRandomSoBO(); // Assumes you have a method to generate a random SoBO object
+        SoBO sobo2 = generateRandomSoBO();
         addSoBO(sobo2, "id");
 
         // Use createEdge method to create an edge
-        Edge edge = generateRandomEdge(); // Assumes you have a method to generate a random Edge
+        Edge edge = generateRandomEdge();
         createEdge(edge, "id");
     }
 

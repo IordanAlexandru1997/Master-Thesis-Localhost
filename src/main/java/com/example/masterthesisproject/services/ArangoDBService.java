@@ -76,10 +76,10 @@ public class ArangoDBService implements DatabaseService {
 
         BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
         if (existingEdge != null) {
-            System.out.println("Edge with edgeKey already exists, updating: " + edgeKey);
+//            System.out.println("Edge with edgeKey already exists, updating: " + edgeKey);
             database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
         } else {
-            System.out.println("Creating new Edge with edgeKey: " + edgeKey);
+//            System.out.println("Creating new Edge with edgeKey: " + edgeKey);
             database.collection(edgeCollectionName).insertDocument(edgeDoc);
         }
 
