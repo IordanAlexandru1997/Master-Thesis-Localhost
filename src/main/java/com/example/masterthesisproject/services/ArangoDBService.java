@@ -8,6 +8,8 @@ import com.arangodb.entity.CollectionType;
 import com.arangodb.ArangoDB;
 import com.arangodb.ArangoDatabase;
 import com.arangodb.entity.BaseDocument;
+import com.example.masterthesisproject.DatabaseService;
+import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.entities.*;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +17,7 @@ import javax.annotation.PostConstruct;
 import java.util.*;
 
 @Service
-public class ArangoDBService {
+public class ArangoDBService implements DatabaseService {
 
     private static final String ARANGO_DB_HOST = "localhost";
     private static final int ARANGO_DB_PORT = 8529;
@@ -37,39 +39,18 @@ public class ArangoDBService {
     }
 
     public void addSoBO(SoBO sobo, String keyAttr) {
-        // Get key from sobo properties
-        String key = String.valueOf(sobo.getProperties().get(keyAttr));
-        if (key == null) {
-            throw new RuntimeException("Key attribute: " + keyAttr + " not found in SoBO properties.");
-        }
-
-        // Create the collection if it doesn't exist
-        if (!database.collection("SoBO").exists()) {
-            CollectionCreateOptions options = new CollectionCreateOptions();
-            options.type(CollectionType.DOCUMENT);
-            database.createCollection("SoBO", options);
-        }
-
         // Define a document
-        BaseDocument soboDoc = new BaseDocument(key);
+        BaseDocument soboDoc = new BaseDocument(sobo.getId());
         soboDoc.setProperties(sobo.getProperties());
-        BaseDocument existingDoc = database.collection("SoBO").getDocument(key, BaseDocument.class);
-        if (existingDoc != null) {
-            database.collection("SoBO").updateDocument(key, soboDoc);
-        } else {
-            database.collection("SoBO").insertDocument(soboDoc);
-        }
-        // Throw an exception if the document could not be created
-        if (database.collection("SoBO").getDocument(key, BaseDocument.class) == null) {
-            throw new RuntimeException("Could not create SoBO document with key: " + key);
-        }
+
         // Check if document exists and update or insert accordingly
-        if (database.collection("SoBO").getDocument(key, BaseDocument.class) != null) {
-            database.collection("SoBO").updateDocument(key, soboDoc);
+        if (database.collection("SoBO").documentExists(sobo.getId())) {
+            database.collection("SoBO").updateDocument(sobo.getId(), soboDoc);
         } else {
             database.collection("SoBO").insertDocument(soboDoc);
         }
     }
+
     public void createEdge(Edge edge, String edgeCollectionName) {
         // Check if Edge collection exists and create it if not
         if (!database.collection(edgeCollectionName).exists()) {
@@ -107,4 +88,53 @@ public class ArangoDBService {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
     }
+
+    private static int soboCounter = 0;
+
+    @Override
+    public void create() {
+        SoBO sobo = SoBOGenerator.generateRandomSoBO();
+        addSoBO(sobo, "id");
+
+        soboCounter++;
+        if (soboCounter >= 2) {
+            Edge edge = SoBOGenerator.generateRandomEdge();
+            createEdge(edge, "edgeCollection");
+            soboCounter = 0;
+        }
+    }
+
+
+    @Override
+    public void read() {
+        SoBO sobo = SoBOGenerator.getRandomSoBO();
+        String key = (String) sobo.getProperties().get("id");
+        database.collection("SoBO").getDocument(key, BaseDocument.class);
+    }
+
+    @Override
+    public void update() {
+        SoBO sobo = SoBOGenerator.getRandomSoBO();
+        addSoBO(sobo, "id");
+    }
+
+    @Override
+    public void delete() {
+        SoBO sobo = SoBOGenerator.getRandomSoBO();
+        if (database.collection("SoBO").documentExists(sobo.getId())) {
+            try {
+                database.collection("SoBO").deleteDocument(sobo.getId());
+                SoBOGenerator.removeSoBO(sobo);  // If deletion is successful, remove SoBO from the list
+            } catch (ArangoDBException e) {
+                throw new RuntimeException("Failed to delete Document with key: " + sobo.getId() + " from the database.", e);
+            }
+        } else {
+            // Remove the SoBO from GENERATED_SoBOs since it's no longer in the database
+            SoBOGenerator.removeSoBO(sobo);
+        }
+    }
+
+
+
 }
+

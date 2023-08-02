@@ -10,6 +10,10 @@ public class SoBO {
     private Map<String, Object> properties = new HashMap<>();
     private List<String> idKeys;
 
+    public SoBO(String id) {
+        this.id = id;
+        this.properties.put("id", id);
+    }
     public SoBO() {
     }
 

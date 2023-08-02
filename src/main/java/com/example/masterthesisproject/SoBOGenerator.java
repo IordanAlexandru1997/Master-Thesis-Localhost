@@ -14,15 +14,21 @@ public class SoBOGenerator {
     private static final List<SoBO> GENERATED_SoBOs = new ArrayList<>();
 
     public static SoBO generateRandomSoBO() {
-        List<String> idKeys = new ArrayList<>(KEY_NAMES.subList(0, RANDOM.nextInt(KEY_NAMES.size()) + 1));
-        SoBO sobo = new SoBO(idKeys);
-
-        for (String key : idKeys) {
-            sobo.addProperty(key, UUID.randomUUID().toString());
-        }
-
+        String id = UUID.randomUUID().toString(); // Generate a unique ID here
+        SoBO sobo = new SoBO(id);
         GENERATED_SoBOs.add(sobo);
         return sobo;
+
+        // this works for neo4j.
+//        List<String> idKeys = new ArrayList<>(KEY_NAMES.subList(0, RANDOM.nextInt(KEY_NAMES.size()) + 1));
+//        SoBO sobo = new SoBO(idKeys);
+//
+//        for (String key : idKeys) {
+//            sobo.addProperty(key, UUID.randomUUID().toString());
+//        }
+//
+//        GENERATED_SoBOs.add(sobo);
+//        return sobo;
     }
 
     public static Edge generateRandomEdge() {
@@ -48,4 +54,8 @@ public class SoBOGenerator {
         }
         return GENERATED_SoBOs.get(RANDOM.nextInt(GENERATED_SoBOs.size()));
     }
+    public static void removeSoBO(SoBO sobo) {
+        GENERATED_SoBOs.remove(sobo);
+    }
+
 }
