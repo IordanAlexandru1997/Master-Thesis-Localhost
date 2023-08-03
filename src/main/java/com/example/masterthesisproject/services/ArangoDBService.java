@@ -8,6 +8,7 @@ import com.arangodb.entity.CollectionType;
 import com.arangodb.ArangoDB;
 import com.arangodb.ArangoDatabase;
 import com.arangodb.entity.BaseDocument;
+import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.entities.*;
@@ -134,7 +135,11 @@ public class ArangoDBService implements DatabaseService {
         }
     }
 
-
+    @Override
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries) {
+        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
+        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete);
+    }
 
 }
 

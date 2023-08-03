@@ -1,5 +1,9 @@
 package com.example.masterthesisproject.services;
 
+import com.arcadedb.database.Database;
+import com.example.masterthesisproject.DatabaseBenchmark;
+import com.example.masterthesisproject.DatabaseService;
+import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
@@ -30,7 +34,7 @@ import java.util.Map;
 
 @Service
 @ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('orientdb')}")
-public class OrientDBService {
+public class OrientDBService implements DatabaseService {
 
     private final String ORIENTDB_URL = "remote:localhost";
     private final String DATABASE_NAME = "orientdb";
@@ -53,68 +57,23 @@ public class OrientDBService {
                     soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
                     logger.info("SoBO vertex class created");
                 }
-                // ... remaining code ...
+                if (db.getClass("WORKS_WITH") == null) {
+                    OClass worksWithEdgeClass = db.createClass("WORKS_WITH", "E");
+                    logger.info("WORKS_WITH edge class created");
+                }
+                if (db.getClass("FRIENDS_WITH") == null) {
+                    OClass friendsWithEdgeClass = db.createClass("FRIENDS_WITH", "E");
+                    logger.info("FRIENDS_WITH edge class created");
+                }
+                if (db.getClass("RELATED_WITH") == null) {
+                    OClass friendsWithEdgeClass = db.createClass("RELATED_WITH", "E");
+                    logger.info("RELATED_WITH edge class created");
+                }
             }
         } catch (Exception e) {
             logger.error("Error during init", e);
         }
     }
-
-
-    public void insertEmployee(String name, double salary, String id, String department) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-
-            OVertex employee = db.newVertex("Employee");
-            employee.setProperty("name", name);
-            employee.setProperty("salary", salary);
-            employee.setProperty("id", id);
-            employee.setProperty("department", department);
-            employee.save();
-        }
-    }
-
-    public void insertProject(String id, String name) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-
-            OVertex project = db.newVertex("Project");
-            project.setProperty("id", id);
-            project.setProperty("name", name);
-            project.save();
-        }
-    }
-
-    public void insertInvoice(String id, String customer, double amount) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-
-            OVertex invoice = db.newVertex("Invoice");
-            invoice.setProperty("id", id);
-            invoice.setProperty("customer", customer);
-            invoice.setProperty("amount", amount);
-            invoice.save();
-        }
-    }
-    public void insertEmployeeToProject(String employeeId, String projectId) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-
-            String command = "CREATE EDGE worksOn FROM (SELECT FROM Employee WHERE id = ?) TO (SELECT FROM Project WHERE id = ?)";
-            db.command(new OCommandSQL(command)).execute(employeeId, projectId);
-        }
-    }
-
-    public void insertEmployeeToInvoice(String employeeId, String invoiceId) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-
-            String command = "CREATE EDGE issues FROM (SELECT FROM Employee WHERE id = '" + employeeId + "') TO (SELECT FROM Invoice WHERE id = '" + invoiceId + "')";
-            db.command(command);
-
-        }
-    }
-
 
     public void addSoBO(SoBO sobo, String idPropertyName) {
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
@@ -190,6 +149,70 @@ public class OrientDBService {
 
         return vertex;
     }
+    private static int soboCounter = 0;
+    public void create() {
+        SoBO sobo = SoBOGenerator.generateRandomSoBO();
+        addSoBO(sobo, "id");
 
+        soboCounter++;
+        if (soboCounter >= 2) {
+            Edge edge = SoBOGenerator.generateRandomEdge();
+            createEdge(edge, "edgeCollection");
+            soboCounter = 0;
+        }
+    }
+    @Override
+    public void read() {
+        String id = getRandomSoBOId();
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            String query = "SELECT FROM SoBO WHERE id = ?";
+            OResultSet rs = db.query(query, id);
+        }
+    }
+
+    @Override
+    public void update() {
+        String id = getRandomSoBOId();
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            OVertex vertex = getVertexById(db, id);
+            if (vertex != null) {
+                // Update the properties of the vertex here as needed
+                // For example:
+                vertex.setProperty("name", "New Name");
+                vertex.save();
+            }
+        }
+    }
+
+    @Override
+    public void delete() {
+        String id = getRandomSoBOId();
+        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
+             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            String command = "DELETE VERTEX SoBO WHERE id = ?";
+            db.command(new OCommandSQL(command)).execute(id);
+        }
+    }
+
+    private String getRandomSoBOId() {
+        return SoBOGenerator.getRandomSoBOId();
+    }
+
+    private OVertex getVertexById(ODatabaseSession db, String id) {
+        try (OResultSet rs = db.query("SELECT FROM SoBO WHERE id = ?", id)) {
+            if (rs.hasNext()) {
+                return rs.next().getVertex().get();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries) {
+        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
+        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete);
+    }
 
 }

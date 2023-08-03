@@ -1,7 +1,9 @@
 package com.example.masterthesisproject.services;
 
+import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
+import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;
@@ -12,10 +14,7 @@ import org.neo4j.driver.Record;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.example.masterthesisproject.SoBOGenerator.*;
 import static org.neo4j.driver.Values.parameters;
@@ -79,18 +78,6 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    public void deleteSoBO(String soboId, String uniqueField) {
-        try (Session session = driver.session()) {
-            StringBuilder queryBuilder = new StringBuilder();
-
-            queryBuilder.append("MATCH (s {");
-            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
-            queryBuilder.append("}) DETACH DELETE s");
-
-            session.run(queryBuilder.toString(), parameters(uniqueField, soboId));
-        }
-    }
-
     public SoBO getSoBO(String soboId, String uniqueField) {
         try (Session session = driver.session()) {
             StringBuilder queryBuilder = new StringBuilder();
@@ -118,44 +105,72 @@ public class Neo4jService implements DatabaseService {
             return null;
         }
     }
-
-
-
+    private static int soboCounter = 0;
 
     @Override
     public void create() {
-        // Use addSoBO method to create a SoBO object twice to ensure at least two SoBO objects
-        SoBO sobo1 = generateRandomSoBO();
-        addSoBO(sobo1, "id");
+        SoBO sobo = SoBOGenerator.generateRandomSoBO();
+        addSoBO(sobo, "id");
 
-        SoBO sobo2 = generateRandomSoBO();
-        addSoBO(sobo2, "id");
-
-        // Use createEdge method to create an edge
-        Edge edge = generateRandomEdge();
-        createEdge(edge, "id");
+        soboCounter++;
+        if (soboCounter >= 2) {
+            Edge edge = SoBOGenerator.generateRandomEdge();
+            createEdge(edge, "id"); // Note: the unique field for edges could be different, adapt as needed
+            soboCounter = 0;
+        }
     }
 
     @Override
     public void read() {
-        // Use getSoBO method to read a SoBO object
-        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
-        getSoBO(sobo.getId(), "id");
+        String id = getRandomSoBOId();
+        getSoBO(id, "id"); // You may want to handle the result of getSoBO appropriately
     }
 
     @Override
     public void update() {
-        // Use updateSoBO method to update a SoBO object
-        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
-        sobo.addProperty("someProperty", "newValue"); // Update some property of the SoBO object
-        updateSoBO(sobo, "id");
+        SoBO sobo = getRandomSoBO();
+        if (sobo != null) {
+            // Update the properties of sobo as needed
+            // For example:
+            sobo.addProperty("name", "New Name");
+            updateSoBO(sobo, "id");
+        }
+    }
+    @Override
+    public void delete() {
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds();
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform delete operation.");
+            return;
+        }
+
+        String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
+        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
+
+        try (Session session = driver.session()) {
+            String query = "MATCH (s {id: $soboId}) DETACH DELETE s";
+            session.run(query, parameters("soboId", soboIdToDelete));
+        }
+
+        soboIds.remove(soboIdToDelete);
+        SoBOIdTracker.saveSoBOIds(soboIds);
+    }
+
+
+
+    private String getRandomSoBOId() {
+        return SoBOGenerator.getRandomSoBOId();
+    }
+    private String getRandomSoBOId(List<String> soboIds) {
+        int randomIndex = new Random().nextInt(soboIds.size());
+        return soboIds.get(randomIndex);
     }
 
     @Override
-    public void delete() {
-        // Use deleteSoBO method to delete a SoBO object
-        SoBO sobo = getRandomSoBO(); // Assumes you have a method to get a random SoBO object
-        deleteSoBO(sobo.getId(), "id");
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries) {
+        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
+        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete);
     }
 }
 
