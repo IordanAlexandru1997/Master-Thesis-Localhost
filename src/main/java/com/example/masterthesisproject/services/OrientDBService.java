@@ -4,6 +4,7 @@ import com.arcadedb.database.Database;
 import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
+import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
@@ -25,11 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
+import java.util.*;
 
 
 @Service
@@ -151,6 +148,7 @@ public class OrientDBService implements DatabaseService {
     }
     private static int soboCounter = 0;
     public void create() {
+
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
 
@@ -163,42 +161,91 @@ public class OrientDBService implements DatabaseService {
     }
     @Override
     public void read() {
-        String id = getRandomSoBOId();
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform read operation.");
+            return;
+        }
+
+        String id = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             String query = "SELECT FROM SoBO WHERE id = ?";
             OResultSet rs = db.query(query, id);
+            System.out.println("SoBO with ID " + id + ":");
+            System.out.println(rs.next().getVertex().get().toJSON());
         }
+
+        soboIds.remove(id); // Remove the read ID from the list
+        SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
     }
+
+    private final List<String> updatedIds = new ArrayList<>();
 
     @Override
     public void update() {
-        String id = getRandomSoBOId();
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform update operation.");
+            return;
+        }
+
+        soboIds.removeAll(updatedIds); // Remove already updated IDs
+
+        if (soboIds.isEmpty()) {
+            System.out.println("All SoBOs have been updated.");
+            return;
+        }
+
+        String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
+        System.out.println("Selected ID for update: " + id);
+
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             OVertex vertex = getVertexById(db, id);
             if (vertex != null) {
-                // Update the properties of the vertex here as needed
-                // For example:
-                vertex.setProperty("name", "New Name");
+                vertex.setProperty("name", "Updated Field");
                 vertex.save();
+                updatedIds.add(id); // Add to updated IDs
+                System.out.println("Updated ID: " + id);
+            } else {
+                System.err.println("Vertex not found for ID: " + id);
             }
+
         }
     }
 
+
     @Override
     public void delete() {
-        String id = getRandomSoBOId();
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform delete operation.");
+            return;
+        }
+
+        String id = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             String command = "DELETE VERTEX SoBO WHERE id = ?";
             db.command(new OCommandSQL(command)).execute(id);
         }
+
+        soboIds.remove(id); // Remove the deleted ID from the list
+        SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
     }
 
-    private String getRandomSoBOId() {
-        return SoBOGenerator.getRandomSoBOId();
+
+    public static String getRandomSoBOId(List<String> soboIds) {
+        int randomIndex = new Random().nextInt(soboIds.size());
+        return soboIds.get(randomIndex);
     }
+
 
     private OVertex getVertexById(ODatabaseSession db, String id) {
         try (OResultSet rs = db.query("SELECT FROM SoBO WHERE id = ?", id)) {

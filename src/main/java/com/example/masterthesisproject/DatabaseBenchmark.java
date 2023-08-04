@@ -13,6 +13,9 @@ public class DatabaseBenchmark {
     }
 
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete) {
+        if (percentCreate != 0) {
+            SoBOIdTracker.clearSoBOFile();
+        }
         Random rand = new Random();
 
         // Start timer
@@ -39,5 +42,6 @@ public class DatabaseBenchmark {
         double duration = (endTime - startTime) / 1_000_000_000.0;
         System.out.println("Total time taken: " + duration + " seconds");
     }
+
 
 }

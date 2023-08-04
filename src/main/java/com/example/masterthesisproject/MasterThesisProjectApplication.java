@@ -21,11 +21,11 @@ public class MasterThesisProjectApplication {
 
         ConfigurableApplicationContext context = SpringApplication.run(MasterThesisProjectApplication.class, args);
         Neo4jService neo4jService = context.getBean(Neo4jService.class);
-//        OrientDBService orientDBService = context.getBean(OrientDBService.class);
+        OrientDBService orientDBService = context.getBean(OrientDBService.class);
 //        ArangoDBService arangoDBService = context.getBean(ArangoDBService.class);
 
-//        orientDBService.runBenchmark(0, 60, 30 , 10, 100);
-        neo4jService.runBenchmark(0, 0, 0, 100, 10);
+//        orientDBService.runBenchmark(0, 0, 50 , 0, 10);
+        neo4jService.runBenchmark(0, 0, 50, 0, 10);
 
     }
 }

@@ -125,17 +125,41 @@ public class Neo4jService implements DatabaseService {
         String id = getRandomSoBOId();
         getSoBO(id, "id"); // You may want to handle the result of getSoBO appropriately
     }
+    private final List<String> updatedIds = new ArrayList<>();
 
     @Override
     public void update() {
-        SoBO sobo = getRandomSoBO();
-        if (sobo != null) {
-            // Update the properties of sobo as needed
-            // For example:
-            sobo.addProperty("name", "New Name");
-            updateSoBO(sobo, "id");
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform update operation.");
+            return;
+        }
+
+        soboIds.removeAll(updatedIds); // Remove already updated IDs
+
+        if (soboIds.isEmpty()) {
+            System.out.println("All SoBOs have been updated.");
+            return;
+        }
+
+        String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
+        System.out.println("Selected ID for update: " + id);
+
+        try (Session session = driver.session()) {
+            StringBuilder queryBuilder = new StringBuilder();
+
+            queryBuilder.append("MATCH (s {");
+            queryBuilder.append("`id`").append(": $").append("id");
+            queryBuilder.append("}) SET s.name = 'Updated Field'");
+
+            session.run(queryBuilder.toString(), parameters("id", id));
+
+            updatedIds.add(id); // Add to updated IDs
+            System.out.println("Updated ID: " + id);
         }
     }
+
     @Override
     public void delete() {
         List<String> soboIds = SoBOIdTracker.loadSoBOIds();

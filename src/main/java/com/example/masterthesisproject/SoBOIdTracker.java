@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +19,7 @@ public class SoBOIdTracker {
             File file = new File(FILE_NAME);
             if (file.exists()) {
                 List<String> soboIds = objectMapper.readValue(file, new TypeReference<>() {});
-                System.out.println("Loaded SoBO IDs from " + FILE_NAME + ": " + soboIds); // Debugging print
+//                System.out.println("Loaded SoBO IDs from " + FILE_NAME + ": " + soboIds); // Debugging print
                 return soboIds;
             } else {
                 System.out.println("No SoBO IDs found in " + FILE_NAME);
@@ -27,6 +28,16 @@ public class SoBOIdTracker {
         } catch (IOException e) {
             System.err.println("Error loading SoBO IDs from " + FILE_NAME + ": " + e.getMessage());
             return new ArrayList<>();
+        }
+    }
+    public static void clearSoBOFile() {
+        try {
+            FileWriter writer = new FileWriter(FILE_NAME, false);
+            writer.write(""); // Clearing the content
+            writer.close();
+            System.out.println("SoBO file cleared");
+        } catch (IOException e) {
+            System.err.println("Error clearing SoBO file: " + e.getMessage());
         }
     }
 

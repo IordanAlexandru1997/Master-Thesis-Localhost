@@ -3,6 +3,7 @@ package com.example.masterthesisproject;
 
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
+import com.orientechnologies.orient.core.record.OVertex;
 
 import java.util.*;
 
@@ -31,7 +32,7 @@ public class SoBOGenerator {
         sobo.addProperty("isActive", RANDOM.nextBoolean());
 
         GENERATED_SoBOs.add(sobo);
-        GENERATED_SoBO_IDs.add(sobo.getId()); // Add this line
+        GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
         System.out.println("Generated SoBO with ID: " + sobo.getId()); // Add this line for debugging
         System.out.println("Current list of GENERATED_SoBO_IDs: " + GENERATED_SoBO_IDs); // Debugging print
@@ -88,4 +89,5 @@ public class SoBOGenerator {
         SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
 
     }
+
 }
