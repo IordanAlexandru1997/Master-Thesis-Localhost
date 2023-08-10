@@ -1,6 +1,5 @@
 package com.example.masterthesisproject.entities;
 
-import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import java.util.HashMap;
 import java.util.List;
@@ -27,10 +26,11 @@ public class SoBO {
 
     public void addProperty(String key, Object value) {
         this.properties.put(key, value);
-        if (idKeys.contains(key)) {
+        if (idKeys != null && idKeys.contains(key)) {
             updateId();
         }
     }
+
 
     private void updateId() {
         StringBuilder idBuilder = new StringBuilder();

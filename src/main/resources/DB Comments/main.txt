@@ -1,3 +1,5 @@
+ docker run -p 8080:8080 my-spring-thesis
+docker build -t my-spring-thesis -f DockerConfig .
 
 //        List<String> idKeys1 = Arrays.asList("name", "email");
 //        SoBO sobo1 = new SoBO(idKeys1);

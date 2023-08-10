@@ -1,6 +1,5 @@
 package com.example.masterthesisproject.services;
 
-import com.arcadedb.database.Database;
 import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
@@ -14,15 +13,13 @@ import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.OEdge;
-import com.orientechnologies.orient.core.record.OElement;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
-import com.orientechnologies.orient.core.storage.ORecordDuplicatedException;
-import org.apache.tinkerpop.gremlin.structure.Direction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -30,13 +27,22 @@ import java.util.*;
 
 
 @Service
-@ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('orientdb')}")
+@Lazy
+
 public class OrientDBService implements DatabaseService {
 
-    private final String ORIENTDB_URL = "remote:localhost";
-    private final String DATABASE_NAME = "orientdb";
-    private final String USERNAME = "root";
-    private final String PASSWORD = "parola";
+    @Value("${orientdb.url}")
+    private String ORIENTDB_URL;
+
+    @Value("${orientdb.database}")
+    private String DATABASE_NAME;
+
+    @Value("${orientdb.username}")
+    private String USERNAME;
+
+    @Value("${orientdb.password}")
+    private String PASSWORD;
+
 
     Logger logger = LoggerFactory.getLogger(OrientDBService.class);
 

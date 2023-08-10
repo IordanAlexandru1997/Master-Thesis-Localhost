@@ -9,7 +9,11 @@
         // Reading template. 100% of reads, 0% of updates, 0% of deletes, 0% of creates.
         // Mixed template. 50% of reads, 20% of updates, 20% of creates, 10% of deletes.
 
+In Neo4j, you typically interact with the database through Cypher queries. The native Java driver doesn't offer a direct object mapping like you have with OrientDB's OVertex, where you can directly manipulate vertices and edges as objects.
 
+The snippet you provided for OrientDB takes advantage of OrientDB's native object handling, allowing you to fetch, update, and save vertices as if they were regular Java objects.
+
+With Neo4j, the typical approach would involve writing a Cypher query to update the specific property of a node, as I previously provided in the update method for Neo4j. It's a more declarative approach, relying on the Cypher query language to specify what you want to be done, rather than manipulating objects directly.
 //        Neo4jService neo4jService = context.getBean(Neo4jService.class);
 //
 //        SoBO sobo1 = new SoBO();

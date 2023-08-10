@@ -7,24 +7,31 @@ import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
 import org.neo4j.driver.*;
-import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.types.Node;
 import org.neo4j.driver.Record;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.util.*;
 
-import static com.example.masterthesisproject.SoBOGenerator.*;
 import static org.neo4j.driver.Values.parameters;
 
 @Service
+@Lazy
+
 public class Neo4jService implements DatabaseService {
 
-    private final String NEO4J_URL = "bolt://localhost:7687";
-    private final String USERNAME = "neo4j";
-    private final String PASSWORD = "password";
+    @org.springframework.beans.factory.annotation.Value("${neo4j.url}")
+    private String NEO4J_URL;
+
+    @org.springframework.beans.factory.annotation.Value("${neo4j.username}")
+    private String USERNAME;
+
+    @org.springframework.beans.factory.annotation.Value("${neo4j.password}")
+    private String PASSWORD;
+
     private Driver driver;
 
     @PostConstruct
@@ -63,18 +70,6 @@ public class Neo4jService implements DatabaseService {
             params.put("properties", edge.getProperties());
 
             session.run(queryBuilder.toString(), params);
-        }
-    }
-    public void updateSoBO(SoBO soboObj, String uniqueField) {
-        try (Session session = driver.session()) {
-            Map<String, Object> properties = soboObj.getProperties();
-            StringBuilder queryBuilder = new StringBuilder();
-
-            queryBuilder.append("MATCH (s {");
-            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
-            queryBuilder.append("}) SET s += $properties");
-
-            session.run(queryBuilder.toString(), parameters("properties", properties, uniqueField, properties.get(uniqueField)));
         }
     }
 

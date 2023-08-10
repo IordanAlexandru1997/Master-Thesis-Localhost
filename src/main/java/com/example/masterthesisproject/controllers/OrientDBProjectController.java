@@ -1,20 +1,11 @@
 package com.example.masterthesisproject.controllers;
 
 import com.example.masterthesisproject.services.OrientDBService;
-import com.example.masterthesisproject.entities.Employee;
-import com.example.masterthesisproject.entities.Invoice;
-import com.example.masterthesisproject.entities.Project;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 @RestController
-@ConditionalOnExpression("#{T(com.example.masterthesisproject.services.DockerContainerChecker).isContainerRunning('orientdb')}")
 public class OrientDBProjectController {
 
     @Autowired

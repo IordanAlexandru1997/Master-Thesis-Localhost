@@ -1,16 +1,8 @@
 package com.example.masterthesisproject.controllers;
-
-import com.example.masterthesisproject.entities.Employee;
-import com.example.masterthesisproject.entities.Invoice;
-import com.example.masterthesisproject.entities.Project;
 import com.example.masterthesisproject.services.ArangoDBService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
 
 @RestController
 public class ArangoDBProjectController {
