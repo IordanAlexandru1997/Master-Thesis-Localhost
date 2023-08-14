@@ -1,6 +1,6 @@
- docker run -p 8080:8080 my-spring-thesis
 docker build -t my-spring-thesis -f DockerConfig .
-
+docker run -p 8080:8080 my-spring-thesis
+wireguard portainer address (neo4j port) : http://10.0.1.222:7474/browser/
 //        List<String> idKeys1 = Arrays.asList("name", "email");
 //        SoBO sobo1 = new SoBO(idKeys1);
 //        sobo1.addProperty("name", "Popa Maricica");
