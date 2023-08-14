@@ -3,7 +3,7 @@ In DGraph, mutations are written in RDF format, not in JSON
 -> Complex syntax, uses mutations : Mutations allow you to modify server-side data, and it also returns an object based on the operation performed. It can be used to insert, update, or delete data. Dgraph automatically generates GraphQL mutations for each type that you define in your schema.
 -> need for committing the transaction after insert / delete
 -> need for waiting after querying. Indexing is not immediate (special method: waitForIndexing in DGraph client)
--> Problems with Ratel (their GUI). Does not start on any port (Maybe vpn issues)
+-> Problems with Ratel ( their GUI). Does not start on any port (Maybe vpn issues)
 
 
 business logic:
