@@ -19,7 +19,7 @@ public class MasterThesisProjectApplication {
 //        ArangoDBService arangoDBService = context.getBean(ArangoDBService.class);
 
 //        orientDBService.runBenchmark(100, 0, 0 , 0, 100);
-        neo4jService.runBenchmark(100, 0, 0, 0, 150);
+        neo4jService.runBenchmark(0, 0, 0, 100, 400);
 //        arangoDBService.runBenchmark(100, 0, 0, 0 , 80);
     }
 }
