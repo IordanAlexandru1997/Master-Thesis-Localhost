@@ -1,2 +1,111 @@
 ArangoDB - multimodel NoSQL database. It is hard to model the graph relationships. Not as straightforward -> higher complexity.
 - expects the UID to be a string (names). It is not possible to use numbers as UIDs.
+
+
+    public void createEdge(Edge edge, String edgeCollectionName) {
+        // Check if Edge collection exists and create it if not
+        if (!database.collection(edgeCollectionName).exists()) {
+            CollectionCreateOptions options = new CollectionCreateOptions();
+            options.type(CollectionType.EDGES);
+            database.createCollection(edgeCollectionName, options);
+        }
+
+        // Create Edge document
+        String edgeKey = UUID.randomUUID().toString();
+        String id1 = (String) edge.getSoboObj1().getProperties().get("id");
+        String id2 = (String) edge.getSoboObj2().getProperties().get("id");
+        System.out.println("id1: " + id1 + " id2: " + id2);
+        if (id1 == null || id2 == null) {
+            throw new RuntimeException("Id properties for edge vertices not found.");
+        }
+
+        BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
+        edgeDoc.setProperties(edge.getProperties());
+        BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
+        if (existingEdge != null) {
+            database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
+        } else {
+            database.collection(edgeCollectionName).insertDocument(edgeDoc);
+        }
+
+        // Throw an exception if the edge could not be created
+        if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
+            throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
+        }
+    }
+
+
+
+    working code last version:
+        public void addSoBO(SoBO sobo, String keyAttr) {
+            // Get key from sobo properties
+            String key = String.valueOf(sobo.getProperties().get(keyAttr));
+            if (key == null) {
+                throw new RuntimeException("Key attribute: " + keyAttr + " not found in SoBO properties.");
+            }
+
+            // Create the collection if it doesn't exist
+            if (!database.collection("SoBO").exists()) {
+                CollectionCreateOptions options = new CollectionCreateOptions();
+                options.type(CollectionType.DOCUMENT);
+                database.createCollection("SoBO", options);
+            }
+
+            // Define a document
+            BaseDocument soboDoc = new BaseDocument(key);
+            soboDoc.setProperties(sobo.getProperties());
+            BaseDocument existingDoc = database.collection("SoBO").getDocument(key, BaseDocument.class);
+            if (existingDoc != null) {
+                database.collection("SoBO").updateDocument(key, soboDoc);
+            } else {
+                database.collection("SoBO").insertDocument(soboDoc);
+            }
+            // Throw an exception if the document could not be created
+            if (database.collection("SoBO").getDocument(key, BaseDocument.class) == null) {
+                throw new RuntimeException("Could not create SoBO document with key: " + key);
+            }
+            // Check if document exists and update or insert accordingly
+            if (database.collection("SoBO").getDocument(key, BaseDocument.class) != null) {
+                database.collection("SoBO").updateDocument(key, soboDoc);
+            } else {
+                database.collection("SoBO").insertDocument(soboDoc);
+            }
+        }
+        public void createEdge(Edge edge, String edgeCollectionName) {
+            // Check if Edge collection exists and create it if not
+            if (!database.collection(edgeCollectionName).exists()) {
+                CollectionCreateOptions options = new CollectionCreateOptions();
+                options.type(CollectionType.EDGES);
+                database.createCollection(edgeCollectionName, options);
+            }
+
+            // Create Edge document
+            String edgeKey = UUID.randomUUID().toString();
+            System.out.println("Generated edgeKey: " + edgeKey);  // Log the generated edgeKey
+
+            String id1 = (String) edge.getSoboObj1().getProperties().get("id");
+            String id2 = (String) edge.getSoboObj2().getProperties().get("id");
+
+            Map<String, Object> properties = edge.getProperties();
+            if(properties == null) {
+                properties = new HashMap<>();
+            }
+            BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
+            edgeDoc.setKey(edgeKey);
+            edgeDoc.setProperties(properties);
+
+            BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
+            if (existingEdge != null) {
+                System.out.println("Edge with edgeKey already exists, updating: " + edgeKey);
+                database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
+            } else {
+                System.out.println("Creating new Edge with edgeKey: " + edgeKey);
+                database.collection(edgeCollectionName).insertDocument(edgeDoc);
+            }
+
+            // Throw an exception if the edge could not be created
+            if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
+                throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
+            }
+        }
+
