@@ -27,4 +27,4 @@ jobs:
       with:
         context: .
         push: true
-        tags: username/my-spring-thesis:latest  # Replace 'username' with your DockerHub username.
+        tags: alexandru1997/my-spring-thesis:latest  # Replace 'username' with your DockerHub username.
