@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Benchmark Tool</title>
+</head>
+<body>
+
+<h1>Benchmark Configuration</h1>
+
+<form action="#" th:action="@{/runBenchmark}" method="post">
+    <label for="database">Select Database:</label>
+    <select id="database" name="database">
+        <option value="Neo4j">Neo4j</option>
+        <option value="OrientDB">OrientDB</option>
+        <option value="ArangoDB">ArangoDB</option>
+    </select><br><br>
+
+    <label for="percentCreate">Percent Create:</label>
+    <input type="number" id="percentCreate" name="percentCreate"><br><br>
+
+    <label for="percentRead">Percent Read:</label>
+    <input type="number" id="percentRead" name="percentRead"><br><br>
+
+    <label for="percentUpdate">Percent Update:</label>
+    <input type="number" id="percentUpdate" name="percentUpdate"><br><br>
+
+    <label for="percentDelete">Percent Delete:</label>
+    <input type="number" id="percentDelete" name="percentDelete"><br><br>
+
+    <label for="numEntries">Number of Entries:</label>
+    <input type="number" id="numEntries" name="numEntries"><br><br>
+
+    <input type="submit" value="Run Benchmark">
+</form>
+
+<h2 th:text="${message}"></h2>
+
+</body>
+</html>
