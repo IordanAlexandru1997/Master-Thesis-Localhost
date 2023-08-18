@@ -100,26 +100,56 @@ public class Neo4jService implements DatabaseService {
             return null;
         }
     }
+    public void clearDatabase() {
+        try (Session session = driver.session()) {
+            String query = "MATCH (n) DETACH DELETE n";
+            session.run(query);
+        }
+    }
+
     private static int soboCounter = 0;
 
     @Override
     public void create() {
+
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
 
         soboCounter++;
         if (soboCounter >= 2) {
             Edge edge = SoBOGenerator.generateRandomEdge();
-            createEdge(edge, "id"); // Note: the unique field for edges could be different, adapt as needed
+            createEdge(edge, "id");
             soboCounter = 0;
         }
+        SoBOIdTracker.appendSoBOId(sobo.getId());
     }
 
     @Override
     public void read() {
-        String id = getRandomSoBOId();
-        getSoBO(id, "id"); // You may want to handle the result of getSoBO appropriately
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform read operation.");
+            return;
+        }
+
+        String customId = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+
+        try (Session session = driver.session()) {
+            String query = "MATCH (s) WHERE s.id = $customId RETURN s"; // Query without specifying node label
+            Result result = session.run(query, parameters("customId", customId));
+
+            if (result.hasNext()) {
+                Node node = result.next().get("s").asNode();
+                System.out.println("SoBO with custom ID " + customId + ":");
+                System.out.println(node.asMap());
+            } else {
+                System.err.println("No SoBO found with custom ID " + customId);
+            }
+        }
     }
+
+
     private final List<String> updatedIds = new ArrayList<>();
 
     @Override

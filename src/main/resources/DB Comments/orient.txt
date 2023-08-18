@@ -1,6 +1,10 @@
 Need to manually create the class before creating the vertex.  Also, the class V is by default the vertice class which is a superclass
 The issue here is that OrientDB does not support MERGE directly as Neo4j does. You have to manually check if the vertex or edge exists before creation.
 
+orientdb init commands: create class SoBO extends V;
+
+very big known problem with delete function. the internal db caching mechanism does not work properly when given calls therefore does not fully delete records.
+
 //main method
         ConfigurableApplicationContext context = SpringApplication.run(MasterThesisProjectApplication.class, args);
 //        Neo4jService neo4jService = context.getBean(Neo4jService.class);

@@ -8,7 +8,7 @@ import com.orientechnologies.orient.core.record.OVertex;
 import java.util.*;
 
 public class SoBOGenerator {
-    private static final List<String> GENERATED_SoBO_IDs = SoBOIdTracker.loadSoBOIds(); // Load existing SoBO IDs
+    public static final List<String> GENERATED_SoBO_IDs = SoBOIdTracker.loadSoBOIds(); // Load existing SoBO IDs
 
     private static final List<String> KEY_NAMES = Arrays.asList("name", "email", "age", "outlook", "yahoo");
     private static final List<String> EDGE_TYPES = Arrays.asList("RELATED_TO", "FRIENDS_WITH", "WORKS_WITH");
@@ -33,9 +33,8 @@ public class SoBOGenerator {
 
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
-        SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
-        System.out.println("Generated SoBO with ID: " + sobo.getId()); // Add this line for debugging
-        System.out.println("Current list of GENERATED_SoBO_IDs: " + GENERATED_SoBO_IDs); // Debugging print
+//        SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
+
 
 
         return sobo;

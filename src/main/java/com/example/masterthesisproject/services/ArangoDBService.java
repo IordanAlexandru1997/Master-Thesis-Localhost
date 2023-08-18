@@ -53,6 +53,7 @@ public class ArangoDBService implements DatabaseService {
         database = arangoDB.db(DB_NAME);
     }
 
+
     public void addSoBO(SoBO sobo, String keyAttr) {
         // Define a document
         BaseDocument soboDoc = new BaseDocument(sobo.getId());
@@ -103,11 +104,16 @@ public class ArangoDBService implements DatabaseService {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
     }
-
+    public void clearDatabase() {
+        if (database.collection("SoBO").exists()) {
+            database.collection("SoBO").truncate();
+        }
+    }
     private static int soboCounter = 0;
 
     @Override
     public void create() {
+
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
 
@@ -117,14 +123,33 @@ public class ArangoDBService implements DatabaseService {
             createEdge(edge, "edgeCollection");
             soboCounter = 0;
         }
+        SoBOIdTracker.appendSoBOId(sobo.getId());
+
     }
 
 
     @Override
     public void read() {
-        SoBO sobo = SoBOGenerator.getRandomSoBO();
-        String key = (String) sobo.getProperties().get("id");
-        database.collection("SoBO").getDocument(key, BaseDocument.class);
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
+        if (soboIds.isEmpty()) {
+            System.err.println("No SoBOs have been generated. Cannot perform read operation.");
+            return;
+        }
+
+        String customId = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+
+        try {
+            if (database.collection("SoBO").documentExists(customId)) {
+                BaseDocument document = database.collection("SoBO").getDocument(customId, BaseDocument.class);
+                System.out.println("SoBO with custom ID " + customId + ":");
+                System.out.println(document.getProperties());
+            } else {
+                System.err.println("No SoBO found with custom ID " + customId);
+            }
+        } catch (ArangoDBException e) {
+            throw new RuntimeException("Failed to read Document with key: " + customId, e);
+        }
     }
 
     private final List<String> updatedIds = new ArrayList<>();

@@ -15,33 +15,37 @@ public class DatabaseBenchmark {
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete) {
         if (percentCreate != 0) {
             SoBOIdTracker.clearSoBOFile();
+            service.clearDatabase();
         }
-        Random rand = new Random();
 
-        // Start timer
         long startTime = System.nanoTime();
 
-        for (int i = 0; i < numEntries; i++) {
-            int operation = rand.nextInt(100);
-
-            if (operation < percentCreate) {
-                service.create();
-            } else if (operation < percentCreate + percentRead) {
-                service.read();
-            } else if (operation < percentCreate + percentRead + percentUpdate) {
-                service.update();
-            } else if (operation < percentCreate + percentRead + percentUpdate + percentDelete) {
-                service.delete();
-            }
+        for (int i = 0; i < (numEntries * percentCreate / 100); i++) {
+            System.out.println("Creating SoBOs");
+            service.create();
         }
 
-        // End timer
+        for (int i = 0; i < (numEntries * percentRead / 100); i++) {
+            System.out.println("Reading SoBOs");
+            service.read();
+        }
+
+        for (int i = 0; i < (numEntries * percentUpdate / 100); i++) {
+            System.out.println("Updating SoBOs");
+            service.update();
+        }
+
+        for (int i = 0; i < (numEntries * percentDelete / 100); i++) {
+            System.out.println("Deleting SoBOs");
+            service.delete();
+        }
+
         long endTime = System.nanoTime();
 
-        // Calculate duration in seconds
         double duration = (endTime - startTime) / 1_000_000_000.0;
         System.out.println("Total time taken: " + duration + " seconds");
     }
+
 
 
 }
