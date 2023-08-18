@@ -1,4 +1,5 @@
 package com.example.masterthesisproject.services;
+import com.arangodb.ArangoCursor;
 import com.arangodb.ArangoDBException;
 import com.arangodb.entity.BaseEdgeDocument;
 import com.arangodb.model.CollectionCreateOptions;
@@ -7,6 +8,7 @@ import com.arangodb.entity.CollectionType;
 import com.arangodb.ArangoDB;
 import com.arangodb.ArangoDatabase;
 import com.arangodb.entity.BaseDocument;
+import com.arangodb.util.MapBuilder;
 import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
@@ -127,30 +129,59 @@ public class ArangoDBService implements DatabaseService {
 
     }
 
-
     @Override
     public void read() {
-        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+        // Load the custom IDs from sobo_obj.json
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds();
 
         if (soboIds.isEmpty()) {
-            System.err.println("No SoBOs have been generated. Cannot perform read operation.");
+            System.err.println("No SoBOs have been generated.");
             return;
         }
 
-        String customId = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+        // Pick a random custom ID
+        String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
 
-        try {
-            if (database.collection("SoBO").documentExists(customId)) {
-                BaseDocument document = database.collection("SoBO").getDocument(customId, BaseDocument.class);
-                System.out.println("SoBO with custom ID " + customId + ":");
-                System.out.println(document.getProperties());
-            } else {
-                System.err.println("No SoBO found with custom ID " + customId);
+        // Use the picked custom ID to fetch the node
+        String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
+        Map<String, Object> bindVars = new HashMap<>();
+        bindVars.put("id", randomSoBOId);
+        ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
+
+
+        if (nodeResult.hasNext()) {
+            BaseDocument sobo = nodeResult.next();
+            System.out.println("Selected SoBO with ID: " + sobo.getId());
+
+            // Fetch the neighbors of the selected SoBO node considering all possible relationships
+            String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
+            bindVars = new MapBuilder().put("id", sobo.getId()).get();
+            ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
+
+            StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+            while (neighborsResult.hasNext()) {
+                HashMap<String, Object> record = neighborsResult.next();
+                HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
+                BaseDocument neighbor = new BaseDocument();
+                neighbor.setKey((String) neighborMap.get("_key"));
+                neighbor.setId((String) neighborMap.get("_id"));
+                neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
+
+                String relationshipType = (String) record.get("relationshipType");
+
+                // Crop the "SoBO/" prefix from the neighbor ID
+                String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
+
+                neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
             }
-        } catch (ArangoDBException e) {
-            throw new RuntimeException("Failed to read Document with key: " + customId, e);
+
+            System.out.println(neighbors.toString());
+
+        } else {
+            System.err.println("No SoBO found for custom ID: " + randomSoBOId);
         }
     }
+
 
     private final List<String> updatedIds = new ArrayList<>();
     public String getRandomSoBOId(List<String> soboIds) {

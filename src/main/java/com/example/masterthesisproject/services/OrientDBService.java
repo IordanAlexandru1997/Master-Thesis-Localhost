@@ -10,11 +10,14 @@ import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.ODatabaseType;
 import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
+import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
+import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,29 +185,48 @@ public class OrientDBService implements DatabaseService {
     }
     @Override
     public void read() {
-        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+        // Load the custom IDs from sobo_obj.json
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds();
 
         if (soboIds.isEmpty()) {
-            System.err.println("No SoBOs have been generated. Cannot perform read operation.");
+            System.err.println("No SoBOs have been generated.");
             return;
         }
 
-        String id = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
+        // Pick a random custom ID
+        String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
 
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            String query = "SELECT FROM SoBO WHERE id = ?";
-            OResultSet rs = db.query(query, id);
-            if (rs.hasNext()) {
-                OVertex result = rs.next().getVertex().get();
-                System.out.println("SoBO with ID " + id + ":");
-                System.out.println(result.toJSON());
+        // Use the picked custom ID to fetch the node
+        String nodeQuery = "SELECT FROM V WHERE id = ?";
+        try (ODatabaseSession db = new ODatabaseDocumentTx(ORIENTDB_URL + "/" + DATABASE_NAME).open(USERNAME, PASSWORD)) {
+            OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
+
+            if (nodeResult.hasNext()) {
+                OResult sobo = nodeResult.next();
+                System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
+
+                // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
+
+                OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
+
+                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+                while (neighborsResult.hasNext()) {
+                    OResult record = neighborsResult.next();
+                    String neighborId = record.getProperty("id");
+                    String relationshipType = record.getProperty("@class");
+                    neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                }
+
+                System.out.println(neighbors.toString());
+
             } else {
-                System.err.println("No SoBO found with ID " + id);
+                System.err.println("No SoBO found for custom ID: " + randomSoBOId);
             }
         }
-// probability that the same random extracted sobo obj to be read twice
     }
+
+
 
 
     private final List<String> updatedIds = new ArrayList<>();
