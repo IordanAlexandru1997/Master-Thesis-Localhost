@@ -21,6 +21,7 @@ public class Edge {
         this.type = type;
         this.properties= new HashMap<>();
     }
+
     public SoBO getSoboObj1() {
         return soboObj1;
     }

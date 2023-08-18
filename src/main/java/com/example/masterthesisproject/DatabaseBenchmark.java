@@ -2,7 +2,6 @@ package com.example.masterthesisproject;
 
 
 import java.util.Random;
-
 public class DatabaseBenchmark {
     private DatabaseService service;
     private int numEntries;
@@ -12,7 +11,8 @@ public class DatabaseBenchmark {
         this.numEntries = numEntries;
     }
 
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete) {
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete,
+                             int minEdgesPerNode, int maxEdgesPerNode) { // Added minEdgesPerNode and maxEdgesPerNode
         if (percentCreate != 0) {
             SoBOIdTracker.clearSoBOFile();
             service.clearDatabase();
@@ -22,7 +22,7 @@ public class DatabaseBenchmark {
 
         for (int i = 0; i < (numEntries * percentCreate / 100); i++) {
             System.out.println("Creating SoBOs");
-            service.create();
+            service.create(minEdgesPerNode, maxEdgesPerNode); // Pass the parameters here
         }
 
         for (int i = 0; i < (numEntries * percentRead / 100); i++) {
@@ -45,7 +45,4 @@ public class DatabaseBenchmark {
         double duration = (endTime - startTime) / 1_000_000_000.0;
         System.out.println("Total time taken: " + duration + " seconds");
     }
-
-
-
 }

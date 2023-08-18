@@ -13,7 +13,7 @@ public class SoBOGenerator {
     private static final List<String> KEY_NAMES = Arrays.asList("name", "email", "age", "outlook", "yahoo");
     private static final List<String> EDGE_TYPES = Arrays.asList("RELATED_TO", "FRIENDS_WITH", "WORKS_WITH");
     private static final Random RANDOM = new Random();
-    private static final List<SoBO> GENERATED_SoBOs = new ArrayList<>();
+    public static final List<SoBO> GENERATED_SoBOs = new ArrayList<>();
 
     public static SoBO generateRandomSoBO() {
         // here we generate a random number of keys for the SoBO object.
@@ -66,6 +66,26 @@ public class SoBOGenerator {
 
         return new Edge(sobo1, sobo2, edgeType);
     }
+    public static List<Edge> generateEdgesForSoBOs(List<SoBO> sobos, int minEdges, int maxEdges) {
+        int totalSoBOs = sobos.size();
+        int maxPossibleEdges = totalSoBOs * (totalSoBOs - 1) / 2;
+        List<Edge> edges = new ArrayList<>();
+
+        for (SoBO sobo : sobos) {
+            int edgeCount = new Random().nextInt((maxEdges - minEdges) + 1) + minEdges;
+            for (int i = 0; i < edgeCount && edges.size() < maxPossibleEdges; i++) {
+                SoBO targetSoBO;
+                do {
+                    targetSoBO = getRandomSoBO();
+                } while (targetSoBO.getId().equals(sobo.getId()) || edges.contains(new Edge(sobo, targetSoBO, "")));
+
+                Edge edge = new Edge(sobo, targetSoBO, EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size())));
+                edges.add(edge);
+            }
+        }
+        return edges;
+    }
+
 
     public static SoBO getRandomSoBO() {
         if (GENERATED_SoBOs.isEmpty()) {

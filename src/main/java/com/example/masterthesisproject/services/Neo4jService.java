@@ -111,7 +111,7 @@ public class Neo4jService implements DatabaseService {
     private static int soboCounter = 0;
 
     @Override
-    public void create() {
+    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
 
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
@@ -235,9 +235,10 @@ public class Neo4jService implements DatabaseService {
     }
 
     @Override
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries) {
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
         DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
-        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete);
+        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
     }
+
 }
 

@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 import javax.annotation.PostConstruct;
 import java.util.*;
 
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
+
 @Service
 @Lazy
 
@@ -111,23 +114,32 @@ public class ArangoDBService implements DatabaseService {
             database.collection("SoBO").truncate();
         }
     }
-    private static int soboCounter = 0;
 
     @Override
-    public void create() {
-
+    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
+        // Create and add SoBO
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
-
-        soboCounter++;
-        if (soboCounter >= 2) {
-            Edge edge = SoBOGenerator.generateRandomEdge();
-            createEdge(edge, "edgeCollection");
-            soboCounter = 0;
-        }
+        GENERATED_SoBOs.add(sobo);
+        GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
 
+        // Determine how many edges to generate for this SoBO
+        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+
+        for (int i = 0; i < numEdges; i++) {
+            // Randomly select a previous SoBO to connect with
+            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size() - 1));
+
+            // Avoid self-connections
+            if (!sobo.equals(targetSoBO)) {
+                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                createEdge(edge, "edgeCollection");
+            }
+        }
     }
+
+
 
     @Override
     public void read() {
@@ -161,18 +173,26 @@ public class ArangoDBService implements DatabaseService {
             StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
             while (neighborsResult.hasNext()) {
                 HashMap<String, Object> record = neighborsResult.next();
-                HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
-                BaseDocument neighbor = new BaseDocument();
-                neighbor.setKey((String) neighborMap.get("_key"));
-                neighbor.setId((String) neighborMap.get("_id"));
-                neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
 
-                String relationshipType = (String) record.get("relationshipType");
+                // Check if the record is not null and contains the "neighbor" key
+                if (record != null && record.containsKey("neighbor")) {
+                    HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
 
-                // Crop the "SoBO/" prefix from the neighbor ID
-                String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
+                    // Ensure that the neighborMap is not null before attempting to retrieve values from it
+                    if (neighborMap != null) {
+                        BaseDocument neighbor = new BaseDocument();
+                        neighbor.setKey((String) neighborMap.get("_key"));
+                        neighbor.setId((String) neighborMap.get("_id"));
+                        neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
 
-                neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                        String relationshipType = (String) record.get("relationshipType");
+
+                        // Crop the "SoBO/" prefix from the neighbor ID
+                        String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
+
+                        neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                    }
+                }
             }
 
             System.out.println(neighbors.toString());
@@ -263,10 +283,11 @@ public class ArangoDBService implements DatabaseService {
 
 
     @Override
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries) {
+    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
         DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
-        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete);
+        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
     }
+
 
 }
 

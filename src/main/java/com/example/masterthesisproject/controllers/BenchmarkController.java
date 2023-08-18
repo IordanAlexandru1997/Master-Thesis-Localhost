@@ -34,17 +34,19 @@ public class BenchmarkController {
                                @RequestParam int percentUpdate,
                                @RequestParam int percentDelete,
                                @RequestParam int numEntries,
+                               @RequestParam int minEdgesPerNode,
+                               @RequestParam int maxEdgesPerNode,
                                Model model) {
 
         switch (database) {
             case "Neo4j":
-                neo4jService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries);
+                neo4jService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
                 break;
             case "OrientDB":
-                orientDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries);
+                orientDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
                 break;
             case "ArangoDB":
-                arangoDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries);
+                arangoDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
                 break;
         }
 
