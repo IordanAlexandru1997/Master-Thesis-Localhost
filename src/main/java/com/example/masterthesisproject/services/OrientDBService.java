@@ -26,12 +26,15 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.util.*;
+
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
 
 
 @Service
 @Lazy
-
 public class OrientDBService implements DatabaseService {
 
     @Value("${orientdb.url}")
@@ -46,107 +49,126 @@ public class OrientDBService implements DatabaseService {
     @Value("${orientdb.password}")
     private String PASSWORD;
 
-
     Logger logger = LoggerFactory.getLogger(OrientDBService.class);
-
+    private OrientDB orientDB;
+    private ODatabaseSession dbSession;
 
     @PostConstruct
     public void init() {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, USERNAME, PASSWORD, OrientDBConfig.defaultConfig())) {
-            if (!orientDB.exists(DATABASE_NAME)) {
-                orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
-            }
-            try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-                if (db.getClass("SoBO") == null) {
-                    OClass soboClass = db.createClass("SoBO");
-                    soboClass.createProperty("id", OType.STRING);
-                    soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
-                    logger.info("SoBO vertex class created");
-                }
-                if (db.getClass("WORKS_WITH") == null) {
-                    OClass worksWithEdgeClass = db.createClass("WORKS_WITH", "E");
-                    logger.info("WORKS_WITH edge class created");
-                }
-                if (db.getClass("FRIENDS_WITH") == null) {
-                    OClass friendsWithEdgeClass = db.createClass("FRIENDS_WITH", "E");
-                    logger.info("FRIENDS_WITH edge class created");
-                }
-                if (db.getClass("RELATED_WITH") == null) {
-                    OClass friendsWithEdgeClass = db.createClass("RELATED_WITH", "E");
-                    logger.info("RELATED_WITH edge class created");
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Error during init", e);
+        initializeSession();
+    }
+
+    private void initializeSession() {
+        if (orientDB == null) {
+            orientDB = new OrientDB(ORIENTDB_URL, USERNAME, PASSWORD, OrientDBConfig.defaultConfig());
+        }
+        if (dbSession == null) {
+            dbSession = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD);
+            logger.info("ODatabaseSession initialized or reinitialized.");
+        }
+        setupSchema();
+    }
+
+    private void setupSchema() {
+
+        if (!orientDB.exists(DATABASE_NAME)) {
+            orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
+        }
+
+        dbSession = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD);
+
+        if (dbSession.getClass("SoBO") == null) {
+            OClass soboClass = dbSession.createClass("SoBO");
+            soboClass.createProperty("id", OType.STRING);
+            soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
+            logger.info("SoBO vertex class created");
+        }
+        if (dbSession.getClass("WORKS_WITH") == null) {
+            dbSession.createClass("WORKS_WITH", "E");
+            logger.info("WORKS_WITH edge class created");
+        }
+        if (dbSession.getClass("FRIENDS_WITH") == null) {
+            dbSession.createClass("FRIENDS_WITH", "E");
+            logger.info("FRIENDS_WITH edge class created");
+        }
+        if (dbSession.getClass("RELATED_WITH") == null) {
+            dbSession.createClass("RELATED_WITH", "E");
+            logger.info("RELATED_WITH edge class created");
         }
     }
 
-    public void addSoBO(SoBO sobo, String idPropertyName) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
-            OResultSet rs = db.query(query, sobo.getId());
 
-            OVertex soboVertex;
+    public void addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
+        String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
+        OResultSet rs = db.query(query, sobo.getId());
+
+        OVertex soboVertex;
+        if (rs.hasNext()) {
+            soboVertex = rs.next().getVertex().get();
+        } else {
+            if (db.getClass("SoBO") == null) {
+                OClass soboClass = db.createClass("SoBO");
+                soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, idPropertyName);
+            }
+            soboVertex = db.newVertex("SoBO");
+        }
+        soboVertex.setProperty(idPropertyName, sobo.getId());
+        for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
+            soboVertex.setProperty(property.getKey(), property.getValue());
+        }
+        soboVertex.save();
+        db.commit();
+    }
+
+    public void createEdgeWithSession(Edge edge, String id, ODatabaseSession db) {
+        // Getting the vertices for soboObj1 and soboObj2
+        OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
+        OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
+        // Checking if the edge already exists
+        OEdge existingEdge = null;
+        try (OResultSet rs = db.query(
+                "SELECT FROM (TRAVERSE bothE() FROM ?) WHERE @class = ? AND in.@rid = ? AND out.@rid = ?",
+                sobo1Vertex.getIdentity(), edge.getType(), sobo2Vertex.getIdentity(), sobo1Vertex.getIdentity())) {
             if (rs.hasNext()) {
-                soboVertex = rs.next().getVertex().get();
-            } else {
-                if (db.getClass("SoBO") == null) {
-                    OClass soboClass = db.createClass("SoBO");
-                    soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, idPropertyName);
-                }
-                soboVertex = db.newVertex("SoBO");
+                existingEdge = rs.next().getEdge().get();
             }
-            soboVertex.setProperty(idPropertyName, sobo.getId());
-            for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
-                soboVertex.setProperty(property.getKey(), property.getValue());
-            }
-            soboVertex.save();
-            db.commit();
         }
-    }
-    public void createEdge(Edge edge, String id) {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            // Getting the vertices for soboObj1 and soboObj2
-            OVertex sobo1Vertex = getOrCreateVertex(db, edge.getSoboObj1());
-            OVertex sobo2Vertex = getOrCreateVertex(db, edge.getSoboObj2());
-            // Checking if the edge already exists
-            OEdge existingEdge = null;
-            try (OResultSet rs = db.query(
-                    "SELECT FROM (TRAVERSE bothE() FROM ?) WHERE @class = ? AND in.@rid = ? AND out.@rid = ?",
-                    sobo1Vertex.getIdentity(), edge.getType(), sobo2Vertex.getIdentity(), sobo1Vertex.getIdentity())) {
-                if (rs.hasNext()) {
-                    existingEdge = rs.next().getEdge().get();
-                }
-            }
-            // If the edge doesn't exist, create a new one
-            if (existingEdge == null) {
-                existingEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
-            }
-            // Update the properties whether it's an existing or new edge
-            if (edge.getProperties() != null) {
-                for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
-                    existingEdge.setProperty(entry.getKey(), entry.getValue());
-                }
-            }
-            existingEdge.save();
+        // If the edge doesn't exist, create a new one
+        if (existingEdge == null) {
+            existingEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
         }
+        // Update the properties whether it's an existing or new edge
+        if (edge.getProperties() != null) {
+            for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
+                existingEdge.setProperty(entry.getKey(), entry.getValue());
+            }
+        }
+        existingEdge.save();
     }
+
     @Override
     public void clearDatabase() {
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            OResultSet result =db.command("truncate class SoBO unsafe");
-            System.out.println(result.next());
+        try {
+            initializeSession();  // Ensure the session is initialized and active
+
+            if (dbSession == null) {
+                logger.error("Database session is null. Cannot execute clearDatabase.");
+                return;
+            }
+
+            OResultSet result = dbSession.command("truncate class SoBO unsafe");
+            if (result.hasNext()) {
+                System.out.println(result.next());
+            } else {
+                logger.warn("No result returned from truncate command.");
+            }
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Failed to cleanup OrientDB database.", e);
+            logger.error("Error while clearing the database.", e);
         }
     }
 
 
-    private OVertex getOrCreateVertex(ODatabaseSession db, SoBO sobo) {
+    private OVertex getOrCreateVertex(SoBO sobo, ODatabaseSession db) {
         OVertex vertex;
         Object id = sobo.getProperties().get("id");
 
@@ -168,21 +190,32 @@ public class OrientDBService implements DatabaseService {
 
         return vertex;
     }
-    private static int soboCounter = 0;
+
+    @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
+        if (dbSession == null) {
+            throw new IllegalStateException("Database session is not initialized.");
+        }
 
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
-        addSoBO(sobo, "id");
+        addSoBOWithSession(sobo, "id", dbSession);
+        GENERATED_SoBOs.add(sobo);
+        GENERATED_SoBO_IDs.add(sobo.getId());
+        SoBOIdTracker.appendSoBOId(sobo.getId());
 
-        soboCounter++;
-        if (soboCounter >= 2) {
-            Edge edge = SoBOGenerator.generateRandomEdge();
-            createEdge(edge, "edgeCollection");
-            soboCounter = 0;
+        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+
+        for (int i = 0; i < numEdges; i++) {
+            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+            if (!sobo.equals(targetSoBO)) {
+                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                createEdgeWithSession(edge, "edgeCollection", dbSession);
+            }
         }
-        System.out.println("SoBO created: " + sobo.getId());
-        SoBOIdTracker.appendSoBOId(sobo.getId());// Save the generated SoBO IDs
+
+        dbSession.commit();
     }
+
     @Override
     public void read() {
         // Load the custom IDs from sobo_obj.json
@@ -198,7 +231,7 @@ public class OrientDBService implements DatabaseService {
 
         // Use the picked custom ID to fetch the node
         String nodeQuery = "SELECT FROM V WHERE id = ?";
-        try (ODatabaseSession db = new ODatabaseDocumentTx(ORIENTDB_URL + "/" + DATABASE_NAME).open(USERNAME, PASSWORD)) {
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
 
             if (nodeResult.hasNext()) {
@@ -250,8 +283,7 @@ public class OrientDBService implements DatabaseService {
         String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
         System.out.println("Selected ID for update: " + id);
 
-        try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
-             ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             OVertex vertex = getVertexById(db, id);
             if (vertex != null) {
                 vertex.setProperty("name", "Updated Field");
@@ -279,21 +311,12 @@ public class OrientDBService implements DatabaseService {
         System.out.println("Selected ID for delete: " + id);
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            String command = "DELETE VERTEX SoBO WHERE id = ?";
-            db.command(new OCommandSQL(command)).execute(id);
+            dbSession.command("DELETE VERTEX SoBO WHERE id = ?", id);
         }
         System.out.println("SoBO deleted: " + id);
         soboIds.remove(id); // Remove the deleted ID from the list
         SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
     }
-
-
-    public static String getRandomSoBOId(List<String> soboIds) {
-        int randomIndex = new Random().nextInt(soboIds.size());
-        return soboIds.get(randomIndex);
-    }
-
-
     private OVertex getVertexById(ODatabaseSession db, String id) {
         try (OResultSet rs = db.query("SELECT FROM SoBO WHERE id = ?", id)) {
             if (rs.hasNext()) {
@@ -303,6 +326,22 @@ public class OrientDBService implements DatabaseService {
         return null;
     }
 
+
+    public static String getRandomSoBOId(List<String> soboIds) {
+        int randomIndex = new Random().nextInt(soboIds.size());
+        return soboIds.get(randomIndex);
+    }
+
+    private OVertex getVertexById(String id) {
+        try (OResultSet rs = dbSession.query("SELECT FROM SoBO WHERE id = ?", id)) {
+            if (rs.hasNext()) {
+                return rs.next().getVertex().get();
+            }
+        }
+        return null;
+    }
+
+
     @Override
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
         DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
@@ -310,4 +349,13 @@ public class OrientDBService implements DatabaseService {
     }
 
 
+    @PreDestroy
+    public void cleanup() {
+        if (dbSession != null) {
+            dbSession.close();
+        }
+        if (orientDB != null) {
+            orientDB.close();
+        }
+    }
 }

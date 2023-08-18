@@ -17,6 +17,8 @@ import javax.annotation.PostConstruct;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
+import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
 import static org.neo4j.driver.Values.parameters;
 
 @Service
@@ -108,22 +110,30 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    private static int soboCounter = 0;
-
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
-
+        // Create and add SoBO
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
-
-        soboCounter++;
-        if (soboCounter >= 2) {
-            Edge edge = SoBOGenerator.generateRandomEdge();
-            createEdge(edge, "id");
-            soboCounter = 0;
-        }
+        GENERATED_SoBOs.add(sobo);
+        GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
+
+        // Determine how many edges to generate for this SoBO
+        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+
+        for (int i = 0; i < numEdges; i++) {
+            // Randomly select a previous SoBO to connect with
+            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+
+            // Avoid self-connections
+            if (!sobo.equals(targetSoBO)) {
+                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                createEdge(edge, "id");
+            }
+        }
     }
+
     @Override
     public void read() {
         try (Session session = driver.session()) {
