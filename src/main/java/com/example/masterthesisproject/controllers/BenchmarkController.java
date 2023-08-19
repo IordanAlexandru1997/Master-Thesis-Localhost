@@ -29,6 +29,7 @@ public class BenchmarkController {
 
     @PostMapping("/runBenchmark")
     public String runBenchmark(@RequestParam String database,
+                               @RequestParam(required = false) boolean optimizeFlag,
                                @RequestParam(defaultValue = "0") int percentCreate,
                                @RequestParam(defaultValue = "0") int percentRead,
                                @RequestParam(defaultValue = "0") int percentUpdate,
@@ -37,6 +38,10 @@ public class BenchmarkController {
                                @RequestParam(defaultValue = "0") int minEdgesPerNode,
                                @RequestParam(defaultValue = "0") int maxEdgesPerNode,
                                Model model) {
+
+        neo4jService.setUiOptimizationFlag(optimizeFlag);
+        orientDBService.setUiOptimizationFlag(optimizeFlag);
+        arangoDBService.setUiOptimizationFlag(optimizeFlag);
 
         switch (database) {
             case "Neo4j":

@@ -39,13 +39,20 @@ public class Neo4jService implements DatabaseService {
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
     private Driver driver;
+    private Boolean uiOptimizationFlag = null;
 
+    public boolean isOptimizationEffective() {
+        return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
+    }
+    public void setUiOptimizationFlag(boolean flag) {
+        this.uiOptimizationFlag = flag;
+    }
     @PostConstruct
     public void init() {
         driver = GraphDatabase.driver(NEO4J_URL, AuthTokens.basic(USERNAME, PASSWORD));
 
         try (Session session = driver.session()) {
-            if (optimizationEnabled) {
+            if (isOptimizationEffective()) {
                 // Create an index on the id property of the SoBO nodes for faster lookup if optimization is enabled.
                 String createIndexQuery = "CREATE INDEX sobo_id_index FOR (n:SoBO) ON (n.id)";
                 session.run(createIndexQuery);
@@ -133,7 +140,7 @@ public class Neo4jService implements DatabaseService {
 
         // Determine how many edges to generate for this SoBO
         int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-
+        System.out.println("numedges : "+ numEdges);
         for (int i = 0; i < numEdges; i++) {
             // Randomly select a previous SoBO to connect with
             SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
@@ -145,7 +152,6 @@ public class Neo4jService implements DatabaseService {
             }
         }
     }
-
     @Override
     public void read() {
         try (Session session = driver.session()) {
@@ -159,18 +165,29 @@ public class Neo4jService implements DatabaseService {
 
             // Pick a random custom ID
             String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-
-            if (optimizationEnabled) {
+            System.out.println("Selected SoBO ID: " + randomSoBOId);  // Print the selected SoBO ID
+            if (isOptimizationEffective()) {
                 // Use Neo4j's API to retrieve a node using custom ID and its neighbors
-                String query = "MATCH (s:SoBO {id: $id})-[:RELATED_TO|:FRIENDS_WITH|:WORKS_WITH]-(neighbor) RETURN neighbor.id as neighborId";
+                String query = "MATCH (s {id: $id})-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) RETURN neighbor.id as neighborId, type(r) as relationshipType";
                 Map<String, Object> parameters = Collections.singletonMap("id", randomSoBOId);
 
                 Result resultSet = session.run(query, parameters);
+
+                if (!resultSet.hasNext()) {
+                    System.err.println("No neighbors found for SoBO ID: " + randomSoBOId);  // Diagnostic message
+                }
+
+                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
                 while (resultSet.hasNext()) {
                     Record record = resultSet.next();
-                    System.out.println("Neighbor ID: " + record.get("neighborId").asString());
+                    String neighborId = record.get("neighborId").asString();
+                    String relationshipType = record.get("relationshipType").asString();
+                    neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
                 }
-            } else {
+                System.out.println(neighbors.toString());
+            }
+
+            else {
                 // Use the picked custom ID to fetch the node
                 String nodeQuery = "MATCH (s {id: $id}) RETURN s";
                 Result nodeResult = session.run(nodeQuery, parameters("id", randomSoBOId));
@@ -195,6 +212,7 @@ public class Neo4jService implements DatabaseService {
                 } else {
                     System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
+
             }
         }
     }

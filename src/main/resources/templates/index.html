@@ -14,6 +14,11 @@
 <div class="container mt-5">
     <h1 class="text-center mb-4">Benchmark Configuration</h1>
     <form th:action="@{/runBenchmark}" method="post" class="bg-light p-4 rounded">
+        <div class="form-group">
+            <input type="checkbox" id="optimizeFlag" name="optimizeFlag">
+            <label for="optimizeFlag">Enable Optimization</label>
+        </div>
+
 
         <div class="form-group">
             <label for="database">Select Database:</label>

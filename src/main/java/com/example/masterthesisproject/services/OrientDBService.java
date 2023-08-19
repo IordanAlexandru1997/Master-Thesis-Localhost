@@ -55,7 +55,14 @@ public class OrientDBService implements DatabaseService {
     Logger logger = LoggerFactory.getLogger(OrientDBService.class);
     private OrientDB orientDB;
     private ODatabaseSession dbSession;
+    private Boolean uiOptimizationFlag = null;
 
+    public boolean isOptimizationEffective() {
+        return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
+    }
+    public void setUiOptimizationFlag(boolean flag) {
+        this.uiOptimizationFlag = flag;
+    }
     @PostConstruct
     public void init() {
         initializeSession();
@@ -83,7 +90,7 @@ public class OrientDBService implements DatabaseService {
             soboClass.createProperty("id", OType.STRING);
 
             // Only create index in optimized mode
-            if (optimizationEnabled) {
+            if (isOptimizationEffective()) {
                 soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
                 logger.info("Optimized index SoBO_ID_IDX created on SoBO class.");
             } else {
@@ -223,7 +230,6 @@ public class OrientDBService implements DatabaseService {
                 createEdgeWithSession(edge, "edgeCollection", dbSession);
             }
         }
-
         dbSession.commit();
     }
 
@@ -239,7 +245,7 @@ public class OrientDBService implements DatabaseService {
 
         // Pick a random custom ID
         String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-        if (optimizationEnabled) {
+        if (isOptimizationEffective()) {
             // Use OrientDB's graph API to retrieve a vertex using custom ID and its neighbors
             String query = "SELECT FROM SoBO WHERE id = ?";
             OResultSet resultSet = dbSession.query(query, randomSoBOId);
