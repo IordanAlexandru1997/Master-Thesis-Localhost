@@ -292,5 +292,10 @@ public class Neo4jService implements DatabaseService {
         benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
     }
 
+    @Override
+    public int countRecords() {
+        return 0;
+    }
+
 }
 

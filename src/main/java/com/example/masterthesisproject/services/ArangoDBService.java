@@ -124,10 +124,19 @@ public class ArangoDBService implements DatabaseService {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
     }
+//    public void clearDatabase() {
+//        if (database.collection("SoBO").exists()) {
+//            database.collection("SoBO").truncate();
+//        }
+//    }
+
+    @Override
     public void clearDatabase() {
-        if (database.collection("SoBO").exists()) {
-            database.collection("SoBO").truncate();
+        if (arangoDB.db(DB_NAME).exists()) {
+            arangoDB.db(DB_NAME).drop();
         }
+        arangoDB.createDatabase(DB_NAME);
+        arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
     }
 
     @Override
@@ -314,6 +323,11 @@ public class ArangoDBService implements DatabaseService {
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
         DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
         benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
+    }
+
+    @Override
+    public int countRecords() {
+        return 0;
     }
 
 

@@ -14,10 +14,18 @@ public class DatabaseBenchmark {
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete,
                              int minEdgesPerNode, int maxEdgesPerNode) { // Added minEdgesPerNode and maxEdgesPerNode
         if (percentCreate != 0) {
+            System.out.println("Clearing SoBO File...");
             SoBOIdTracker.clearSoBOFile();
-            service.clearDatabase();
-        }
 
+            System.out.println("Clearing the database...");
+            service.clearDatabase();
+            System.out.println("Database cleared.");
+
+            // Log the number of records in the database after clearing
+            System.out.println("Number of records after clearing: " + service.countRecords());
+
+            System.out.println("Starting the creation process...");
+        }
         long startTime = System.nanoTime();
 
         for (int i = 0; i < (numEntries * percentCreate / 100); i++) {

@@ -50,19 +50,22 @@ public class OrientDBService implements DatabaseService {
 
     @Value("${orientdb.password}")
     private String PASSWORD;
+
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
+
     Logger logger = LoggerFactory.getLogger(OrientDBService.class);
     private OrientDB orientDB;
-    private ODatabaseSession dbSession;
     private Boolean uiOptimizationFlag = null;
 
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
     }
+
     public void setUiOptimizationFlag(boolean flag) {
         this.uiOptimizationFlag = flag;
     }
+
     @PostConstruct
     public void init() {
         initializeSession();
@@ -72,48 +75,47 @@ public class OrientDBService implements DatabaseService {
         if (orientDB == null) {
             orientDB = new OrientDB(ORIENTDB_URL, USERNAME, PASSWORD, OrientDBConfig.defaultConfig());
         }
-        if (dbSession == null) {
-            dbSession = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD);
-            logger.info("ODatabaseSession initialized or reinitialized.");
-        }
         setupSchema();
     }
+
     private void setupSchema() {
-        if (!orientDB.exists(DATABASE_NAME)) {
-            orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
-        }
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            if (db.getClass("SoBO") == null) {
+                OClass soboClass = db.createClass("SoBO", "V");  // Extend the default V class
+                soboClass.createProperty("id", OType.STRING);
 
-        dbSession = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD);
+                if (isOptimizationEffective()) {
+                    soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
+                    logger.info("Optimized index SoBO_ID_IDX created on SoBO class.");
+                } else {
+                    logger.info("Running in non-optimized mode. No index created on SoBO class.");
+                }
 
-        if (dbSession.getClass("SoBO") == null) {
-            OClass soboClass = dbSession.createClass("SoBO");
-            soboClass.createProperty("id", OType.STRING);
-
-            // Only create index in optimized mode
-            if (isOptimizationEffective()) {
-                soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
-                logger.info("Optimized index SoBO_ID_IDX created on SoBO class.");
-            } else {
-                logger.info("Running in non-optimized mode. No index created on SoBO class.");
+                logger.info("SoBO vertex class created");
             }
 
-            logger.info("SoBO vertex class created");
-        }
+            if (db.getClass("WORKS_WITH") == null) {
+                db.createClass("WORKS_WITH", "E");
+                logger.info("WORKS_WITH edge class created");
+            }
 
-        if (dbSession.getClass("WORKS_WITH") == null) {
-            dbSession.createClass("WORKS_WITH", "E");
-            logger.info("WORKS_WITH edge class created");
-        }
-        if (dbSession.getClass("FRIENDS_WITH") == null) {
-            dbSession.createClass("FRIENDS_WITH", "E");
-            logger.info("FRIENDS_WITH edge class created");
-        }
-        if (dbSession.getClass("RELATED_WITH") == null) {
-            dbSession.createClass("RELATED_WITH", "E");
-            logger.info("RELATED_WITH edge class created");
+            if (db.getClass("FRIENDS_WITH") == null) {
+                db.createClass("FRIENDS_WITH", "E");
+                logger.info("FRIENDS_WITH edge class created");
+            }
+
+            if (db.getClass("RELATED_WITH") == null) {
+                db.createClass("RELATED_WITH", "E");
+                logger.info("RELATED_WITH edge class created");
+            }
+            if (db.getClass("RELATED_TO") == null) {
+                db.createClass("RELATED_TO", "E");
+                logger.info("RELATED_TO edge class created");
+            }
+
+
         }
     }
-
 
 
     public void addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
@@ -124,12 +126,9 @@ public class OrientDBService implements DatabaseService {
         if (rs.hasNext()) {
             soboVertex = rs.next().getVertex().get();
         } else {
-            if (db.getClass("SoBO") == null) {
-                OClass soboClass = db.createClass("SoBO");
-                soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, idPropertyName);
-            }
             soboVertex = db.newVertex("SoBO");
         }
+
         soboVertex.setProperty(idPropertyName, sobo.getId());
         for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
             soboVertex.setProperty(property.getKey(), property.getValue());
@@ -139,10 +138,8 @@ public class OrientDBService implements DatabaseService {
     }
 
     public void createEdgeWithSession(Edge edge, String id, ODatabaseSession db) {
-        // Getting the vertices for soboObj1 and soboObj2
         OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
         OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
-        // Checking if the edge already exists
         OEdge existingEdge = null;
         try (OResultSet rs = db.query(
                 "SELECT FROM (TRAVERSE bothE() FROM ?) WHERE @class = ? AND in.@rid = ? AND out.@rid = ?",
@@ -151,38 +148,26 @@ public class OrientDBService implements DatabaseService {
                 existingEdge = rs.next().getEdge().get();
             }
         }
-        // If the edge doesn't exist, create a new one
+
         if (existingEdge == null) {
             existingEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
         }
-        // Update the properties whether it's an existing or new edge
+
         if (edge.getProperties() != null) {
             for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
                 existingEdge.setProperty(entry.getKey(), entry.getValue());
             }
         }
+
         existingEdge.save();
     }
-
     @Override
     public void clearDatabase() {
-        try {
-            initializeSession();  // Ensure the session is initialized and active
-
-            if (dbSession == null) {
-                logger.error("Database session is null. Cannot execute clearDatabase.");
-                return;
-            }
-
-            OResultSet result = dbSession.command("truncate class SoBO unsafe");
-            if (result.hasNext()) {
-                System.out.println(result.next());
-            } else {
-                logger.warn("No result returned from truncate command.");
-            }
-        } catch (Exception e) {
-            logger.error("Error while clearing the database.", e);
+        if (orientDB.exists(DATABASE_NAME)) {
+            orientDB.drop(DATABASE_NAME);
         }
+        orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
+        setupSchema();  // To re-setup your schema after recreating the database
     }
 
 
@@ -211,26 +196,23 @@ public class OrientDBService implements DatabaseService {
 
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
-        if (dbSession == null) {
-            throw new IllegalStateException("Database session is not initialized.");
-        }
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            SoBO sobo = SoBOGenerator.generateRandomSoBO();
+            addSoBOWithSession(sobo, "id", db);
+            GENERATED_SoBOs.add(sobo);
+            GENERATED_SoBO_IDs.add(sobo.getId());
+            SoBOIdTracker.appendSoBOId(sobo.getId());
 
-        SoBO sobo = SoBOGenerator.generateRandomSoBO();
-        addSoBOWithSession(sobo, "id", dbSession);
-        GENERATED_SoBOs.add(sobo);
-        GENERATED_SoBO_IDs.add(sobo.getId());
-        SoBOIdTracker.appendSoBOId(sobo.getId());
-
-        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-
-        for (int i = 0; i < numEdges; i++) {
-            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
-            if (!sobo.equals(targetSoBO)) {
-                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                createEdgeWithSession(edge, "edgeCollection", dbSession);
+            int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+            for (int i = 0; i < numEdges; i++) {
+                SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+                if (!sobo.equals(targetSoBO)) {
+                    Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                    createEdgeWithSession(edge, "edgeCollection", db);
+                }
             }
+            db.commit();
         }
-        dbSession.commit();
     }
 
     @Override
@@ -248,49 +230,52 @@ public class OrientDBService implements DatabaseService {
         if (isOptimizationEffective()) {
             // Use OrientDB's graph API to retrieve a vertex using custom ID and its neighbors
             String query = "SELECT FROM SoBO WHERE id = ?";
-            OResultSet resultSet = dbSession.query(query, randomSoBOId);
-            OVertex soboVertex = null;
-            if (resultSet.hasNext()) {
-                soboVertex = resultSet.next().getVertex().orElse(null);
-            }
-            if (soboVertex != null) {
-                Iterable<OVertex> neighbors = soboVertex.getVertices(ODirection.OUT);
-                for (OVertex neighbor : neighbors) {
-                    System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
+            try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+                OResultSet resultSet = db.query(query, randomSoBOId);
+
+                OVertex soboVertex = null;
+                if (resultSet.hasNext()) {
+                    soboVertex = resultSet.next().getVertex().orElse(null);
+                }
+                if (soboVertex != null) {
+                    Iterable<OVertex> neighbors = soboVertex.getVertices(ODirection.OUT);
+                    for (OVertex neighbor : neighbors) {
+                        System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
+                    }
                 }
             }
-        }else {
-            // Non-optimized method (existing approach)
-            // Use the picked custom ID to fetch the node
-            String nodeQuery = "SELECT FROM V WHERE id = ?";
-            try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-                OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
+        }else{
+                // Non-optimized method (existing approach)
+                // Use the picked custom ID to fetch the node
+                String nodeQuery = "SELECT FROM V WHERE id = ?";
+                try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+                    OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
 
-                if (nodeResult.hasNext()) {
-                    OResult sobo = nodeResult.next();
-                    System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
+                    if (nodeResult.hasNext()) {
+                        OResult sobo = nodeResult.next();
+                        System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
 
-                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
-                    String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
+                        // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                        String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
 
-                    OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
+                        OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
 
-                    StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-                    while (neighborsResult.hasNext()) {
-                        OResult record = neighborsResult.next();
-                        String neighborId = record.getProperty("id");
-                        String relationshipType = record.getProperty("@class");
-                        neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                        StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+                        while (neighborsResult.hasNext()) {
+                            OResult record = neighborsResult.next();
+                            String neighborId = record.getProperty("id");
+                            String relationshipType = record.getProperty("@class");
+                            neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                        }
+
+                        System.out.println(neighbors.toString());
+
+                    } else {
+                        System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                     }
-
-                    System.out.println(neighbors.toString());
-
-                } else {
-                    System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
             }
         }
-    }
 
 
 
@@ -344,12 +329,19 @@ public class OrientDBService implements DatabaseService {
         System.out.println("Selected ID for delete: " + id);
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            dbSession.command("DELETE VERTEX SoBO WHERE id = ?", id);
+            db.command("DELETE VERTEX SoBO WHERE id = ?", id);  // Corrected line
         }
         System.out.println("SoBO deleted: " + id);
         soboIds.remove(id); // Remove the deleted ID from the list
         SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
     }
+
+
+    public static String getRandomSoBOId(List<String> soboIds) {
+        int randomIndex = new Random().nextInt(soboIds.size());
+        return soboIds.get(randomIndex);
+    }
+
     private OVertex getVertexById(ODatabaseSession db, String id) {
         try (OResultSet rs = db.query("SELECT FROM SoBO WHERE id = ?", id)) {
             if (rs.hasNext()) {
@@ -359,20 +351,17 @@ public class OrientDBService implements DatabaseService {
         return null;
     }
 
-
-    public static String getRandomSoBOId(List<String> soboIds) {
-        int randomIndex = new Random().nextInt(soboIds.size());
-        return soboIds.get(randomIndex);
-    }
-
-    private OVertex getVertexById(String id) {
-        try (OResultSet rs = dbSession.query("SELECT FROM SoBO WHERE id = ?", id)) {
+    public int countRecords() {
+        int count = 0;
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            OResultSet rs = db.query("SELECT COUNT(*) as cnt FROM SoBO");
             if (rs.hasNext()) {
-                return rs.next().getVertex().get();
+                count = ((Long) rs.next().getProperty("cnt")).intValue();
             }
         }
-        return null;
+        return count;
     }
+
 
 
     @Override
@@ -384,9 +373,6 @@ public class OrientDBService implements DatabaseService {
 
     @PreDestroy
     public void cleanup() {
-        if (dbSession != null) {
-            dbSession.close();
-        }
         if (orientDB != null) {
             orientDB.close();
         }
