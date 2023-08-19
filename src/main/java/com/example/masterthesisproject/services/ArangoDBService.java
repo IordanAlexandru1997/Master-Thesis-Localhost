@@ -97,7 +97,7 @@ public class ArangoDBService implements DatabaseService {
 
         // Create Edge document
         String edgeKey = UUID.randomUUID().toString();
-        System.out.println("Generated edgeKey: " + edgeKey);  // Log the generated edgeKey
+//        System.out.println("Generated edgeKey: " + edgeKey);  // Log the generated edgeKey
 
         String id1 = (String) edge.getSoboObj1().getProperties().get("id");
         String id2 = (String) edge.getSoboObj2().getProperties().get("id");
@@ -176,8 +176,8 @@ public class ArangoDBService implements DatabaseService {
         // Use the picked custom ID to fetch the node
 
         if (isOptimizationEffective()) {
-            System.out.println("Reading SoBOs");
-            System.out.println("Selected SoBO with ID: SoBO/" + randomSoBOId);
+//            System.out.println("Reading SoBOs");
+//            System.out.println("Selected SoBO with ID: SoBO/" + randomSoBOId);
 
             // Use AQL to perform graph traversal to get vertex and its neighbors
             String query = "FOR vertex IN 1..1 OUTBOUND @startVertex GRAPH @graphName RETURN vertex";
@@ -196,7 +196,7 @@ public class ArangoDBService implements DatabaseService {
                     System.err.println("Encountered a null vertex in the result set.");
                 }
             });
-            System.out.println(neighbors.toString());
+//            System.out.println(neighbors.toString());
         } else {
             String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
             Map<String, Object> bindVars = new HashMap<>();
@@ -204,7 +204,7 @@ public class ArangoDBService implements DatabaseService {
             ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
             if (nodeResult.hasNext()) {
                 BaseDocument sobo = nodeResult.next();
-                System.out.println("Selected SoBO with ID: " + sobo.getId());
+//                System.out.println("Selected SoBO with ID: " + sobo.getId());
                 // Fetch the neighbors of the selected SoBO node considering all possible relationships
                 String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
                 bindVars = new MapBuilder().put("id", sobo.getId()).get();
@@ -234,7 +234,7 @@ public class ArangoDBService implements DatabaseService {
                     }
                 }
 
-                System.out.println(neighbors.toString());
+//                System.out.println(neighbors.toString());
             } else {
                 System.err.println("No SoBO found for custom ID: " + randomSoBOId);
             }
@@ -261,12 +261,12 @@ public class ArangoDBService implements DatabaseService {
         soboIds.removeAll(updatedIds); // Remove already updated IDs
 
         if (soboIds.isEmpty()) {
-            System.out.println("All SoBOs have been updated.");
+//            System.out.println("All SoBOs have been updated.");
             return;
         }
 
         String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-        System.out.println("Selected ID for update: " + id);
+//        System.out.println("Selected ID for update: " + id);
 
         try {
             if (database.collection("SoBO").documentExists(id)) {
@@ -280,7 +280,7 @@ public class ArangoDBService implements DatabaseService {
                 database.collection("SoBO").updateDocument(id, document);
 
                 updatedIds.add(id); // Add to updated IDs
-                System.out.println("Updated ID: " + id);
+//                System.out.println("Updated ID: " + id);
             } else {
                 System.err.println("Document not found for ID: " + id);
             }
@@ -302,7 +302,7 @@ public class ArangoDBService implements DatabaseService {
         }
 
         String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
-        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
+//        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
 
         if (database.collection("SoBO").documentExists(soboIdToDelete)) {
             try {
@@ -323,11 +323,6 @@ public class ArangoDBService implements DatabaseService {
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
         DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
         benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
-    }
-
-    @Override
-    public int countRecords() {
-        return 0;
     }
 
 

@@ -20,7 +20,7 @@ public class SoBOIdTracker {
             if (file.exists() && file.length() != 0) {  // Check if file has content
                 return objectMapper.readValue(file, new TypeReference<>() {});
             } else {
-                System.out.println("No SoBO IDs found in " + FILE_NAME);
+//                System.out.println("No SoBO IDs found in " + FILE_NAME);
                 return new ArrayList<>();
             }
         } catch (IOException e) {
@@ -34,7 +34,7 @@ public class SoBOIdTracker {
             FileWriter writer = new FileWriter(FILE_NAME, false);
             writer.write(""); // Clearing the content
             writer.close();
-            System.out.println("SoBO file cleared");
+//            System.out.println("SoBO file cleared");
         } catch (IOException e) {
             System.err.println("Error clearing SoBO file: " + e.getMessage());
         }
@@ -43,7 +43,7 @@ public class SoBOIdTracker {
     public static void saveSoBOIds(List<String> soboIds) {
         try {
             objectMapper.writeValue(new File(FILE_NAME), soboIds);
-            System.out.println("SoBO IDs saved to " + FILE_NAME);
+//            System.out.println("SoBO IDs saved to " + FILE_NAME);
         } catch (IOException e) {
             System.err.println("Error saving SoBO IDs to " + FILE_NAME + ": " + e.getMessage());
         }
@@ -53,7 +53,7 @@ public class SoBOIdTracker {
             List<String> existingIds = loadSoBOIds();  // Load existing IDs
             existingIds.add(soboId);  // Add the new ID
             saveSoBOIds(existingIds);  // Save back to the file
-            System.out.println("The soboId " + soboId + " has been appended to " + FILE_NAME);
+//            System.out.println("The soboId " + soboId + " has been appended to " + FILE_NAME);
         } catch (Exception e) {
             System.err.println("Error appending SoBO ID to " + FILE_NAME + ": " + e.getMessage());
         }

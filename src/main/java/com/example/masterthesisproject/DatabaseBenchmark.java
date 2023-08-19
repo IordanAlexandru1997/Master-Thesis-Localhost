@@ -20,11 +20,6 @@ public class DatabaseBenchmark {
             System.out.println("Clearing the database...");
             service.clearDatabase();
             System.out.println("Database cleared.");
-
-            // Log the number of records in the database after clearing
-            System.out.println("Number of records after clearing: " + service.countRecords());
-
-            System.out.println("Starting the creation process...");
         }
         long startTime = System.nanoTime();
 

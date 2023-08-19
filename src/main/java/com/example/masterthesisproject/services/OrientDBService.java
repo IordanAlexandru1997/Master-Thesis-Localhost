@@ -163,12 +163,11 @@ public class OrientDBService implements DatabaseService {
     }
     @Override
     public void clearDatabase() {
-        if (orientDB.exists(DATABASE_NAME)) {
-            orientDB.drop(DATABASE_NAME);
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+            db.command("DELETE VERTEX SoBO");
         }
-        orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
-        setupSchema();  // To re-setup your schema after recreating the database
     }
+
 
 
     private OVertex getOrCreateVertex(SoBO sobo, ODatabaseSession db) {
@@ -240,7 +239,7 @@ public class OrientDBService implements DatabaseService {
                 if (soboVertex != null) {
                     Iterable<OVertex> neighbors = soboVertex.getVertices(ODirection.OUT);
                     for (OVertex neighbor : neighbors) {
-                        System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
+//                        System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
                     }
                 }
             }
@@ -253,7 +252,7 @@ public class OrientDBService implements DatabaseService {
 
                     if (nodeResult.hasNext()) {
                         OResult sobo = nodeResult.next();
-                        System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
+//                        System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
 
                         // Fetch the neighbors of the selected SoBO node considering all possible relationships
                         String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
@@ -268,7 +267,7 @@ public class OrientDBService implements DatabaseService {
                             neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
                         }
 
-                        System.out.println(neighbors.toString());
+//                        System.out.println(neighbors.toString());
 
                     } else {
                         System.err.println("No SoBO found for custom ID: " + randomSoBOId);
@@ -294,12 +293,12 @@ public class OrientDBService implements DatabaseService {
         soboIds.removeAll(updatedIds); // Remove already updated IDs
 
         if (soboIds.isEmpty()) {
-            System.out.println("All SoBOs have been updated.");
+//            System.out.println("All SoBOs have been updated.");
             return;
         }
 
         String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-        System.out.println("Selected ID for update: " + id);
+//        System.out.println("Selected ID for update: " + id);
 
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             OVertex vertex = getVertexById(db, id);
@@ -307,7 +306,7 @@ public class OrientDBService implements DatabaseService {
                 vertex.setProperty("name", "Updated Field");
                 vertex.save();
                 updatedIds.add(id); // Add to updated IDs
-                System.out.println("Updated ID: " + id);
+//                System.out.println("Updated ID: " + id);
             } else {
                 System.err.println("Vertex not found for ID: " + id);
             }
@@ -324,14 +323,14 @@ public class OrientDBService implements DatabaseService {
             System.err.println("No SoBOs have been generated. Cannot perform delete operation.");
             return;
         }
-        System.out.println("The list of soboIds is: " + soboIds);
+//        System.out.println("The list of soboIds is: " + soboIds);
         String id = getRandomSoBOId(soboIds); // Select a random ID from the loaded IDs
-        System.out.println("Selected ID for delete: " + id);
+//        System.out.println("Selected ID for delete: " + id);
         try (OrientDB orientDB = new OrientDB(ORIENTDB_URL, OrientDBConfig.defaultConfig());
              ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             db.command("DELETE VERTEX SoBO WHERE id = ?", id);  // Corrected line
         }
-        System.out.println("SoBO deleted: " + id);
+//        System.out.println("SoBO deleted: " + id);
         soboIds.remove(id); // Remove the deleted ID from the list
         SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
     }
@@ -349,17 +348,6 @@ public class OrientDBService implements DatabaseService {
             }
         }
         return null;
-    }
-
-    public int countRecords() {
-        int count = 0;
-        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            OResultSet rs = db.query("SELECT COUNT(*) as cnt FROM SoBO");
-            if (rs.hasNext()) {
-                count = ((Long) rs.next().getProperty("cnt")).intValue();
-            }
-        }
-        return count;
     }
 
 

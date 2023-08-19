@@ -50,63 +50,63 @@ public class SoBOGenerator {
         return null;
     }
 
+//
+//    public static Edge generateRandomEdge() {
+//        if (GENERATED_SoBOs.size() < 2) {
+//            throw new IllegalStateException("At least two SoBO objects must be created before generating an edge");
+//        }
+//
+//        SoBO sobo1 = getRandomSoBO();
+//        SoBO sobo2 = null;
+//        do {
+//            sobo2 = getRandomSoBO();
+//        } while (sobo2.getId().equals(sobo1.getId())); // the two SoBOs are different
+//
+//        String edgeType = EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size()));
+//
+//        return new Edge(sobo1, sobo2, edgeType);
+//    }
+//    public static List<Edge> generateEdgesForSoBOs(List<SoBO> sobos, int minEdges, int maxEdges) {
+//        int totalSoBOs = sobos.size();
+//        int maxPossibleEdges = totalSoBOs * (totalSoBOs - 1) / 2;
+//        List<Edge> edges = new ArrayList<>();
+//
+//        for (SoBO sobo : sobos) {
+//            int edgeCount = new Random().nextInt((maxEdges - minEdges) + 1) + minEdges;
+//            for (int i = 0; i < edgeCount && edges.size() < maxPossibleEdges; i++) {
+//                SoBO targetSoBO;
+//                do {
+//                    targetSoBO = getRandomSoBO();
+//                } while (targetSoBO.getId().equals(sobo.getId()) || edges.contains(new Edge(sobo, targetSoBO, "")));
+//
+//                Edge edge = new Edge(sobo, targetSoBO, EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size())));
+//                edges.add(edge);
+//            }
+//        }
+//        return edges;
+//    }
 
-    public static Edge generateRandomEdge() {
-        if (GENERATED_SoBOs.size() < 2) {
-            throw new IllegalStateException("At least two SoBO objects must be created before generating an edge");
-        }
-
-        SoBO sobo1 = getRandomSoBO();
-        SoBO sobo2 = null;
-        do {
-            sobo2 = getRandomSoBO();
-        } while (sobo2.getId().equals(sobo1.getId())); // the two SoBOs are different
-
-        String edgeType = EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size()));
-
-        return new Edge(sobo1, sobo2, edgeType);
-    }
-    public static List<Edge> generateEdgesForSoBOs(List<SoBO> sobos, int minEdges, int maxEdges) {
-        int totalSoBOs = sobos.size();
-        int maxPossibleEdges = totalSoBOs * (totalSoBOs - 1) / 2;
-        List<Edge> edges = new ArrayList<>();
-
-        for (SoBO sobo : sobos) {
-            int edgeCount = new Random().nextInt((maxEdges - minEdges) + 1) + minEdges;
-            for (int i = 0; i < edgeCount && edges.size() < maxPossibleEdges; i++) {
-                SoBO targetSoBO;
-                do {
-                    targetSoBO = getRandomSoBO();
-                } while (targetSoBO.getId().equals(sobo.getId()) || edges.contains(new Edge(sobo, targetSoBO, "")));
-
-                Edge edge = new Edge(sobo, targetSoBO, EDGE_TYPES.get(RANDOM.nextInt(EDGE_TYPES.size())));
-                edges.add(edge);
-            }
-        }
-        return edges;
-    }
-
-
-    public static SoBO getRandomSoBO() {
-        if (GENERATED_SoBOs.isEmpty()) {
-            System.out.println("No SoBOs have been generated yet. Generating one now...");
-            return generateRandomSoBO();
-        }
-        return GENERATED_SoBOs.get(RANDOM.nextInt(GENERATED_SoBOs.size()));
-    }
-    public static String getRandomSoBOId() {
-        if (GENERATED_SoBO_IDs.isEmpty()) {
-            System.err.println("No SoBOs have been generated. Cannot fetch a random SoBO ID.");
-            return null; // or throw an exception, depending on your use case
-        }
-        return GENERATED_SoBO_IDs.get(RANDOM.nextInt(GENERATED_SoBO_IDs.size()));
-    }
-
-    public static void removeSoBO(SoBO sobo) {
-        GENERATED_SoBO_IDs.remove(sobo.getId());
-        GENERATED_SoBOs.remove(sobo);
-        SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
-
-    }
+//
+//    public static SoBO getRandomSoBO() {
+//        if (GENERATED_SoBOs.isEmpty()) {
+//            System.out.println("No SoBOs have been generated yet. Generating one now...");
+//            return generateRandomSoBO();
+//        }
+//        return GENERATED_SoBOs.get(RANDOM.nextInt(GENERATED_SoBOs.size()));
+//    }
+//    public static String getRandomSoBOId() {
+//        if (GENERATED_SoBO_IDs.isEmpty()) {
+//            System.err.println("No SoBOs have been generated. Cannot fetch a random SoBO ID.");
+//            return null; // or throw an exception, depending on your use case
+//        }
+//        return GENERATED_SoBO_IDs.get(RANDOM.nextInt(GENERATED_SoBO_IDs.size()));
+//    }
+//
+//    public static void removeSoBO(SoBO sobo) {
+//        GENERATED_SoBO_IDs.remove(sobo.getId());
+//        GENERATED_SoBOs.remove(sobo);
+//        SoBOIdTracker.saveSoBOIds(GENERATED_SoBO_IDs); // Save the updated SoBO IDs list to the file
+//
+//    }
 
 }

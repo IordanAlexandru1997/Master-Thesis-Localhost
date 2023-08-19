@@ -7,6 +7,6 @@ public interface DatabaseService {
     void delete();
     void clearDatabase();
     void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdges, int maxEdges);
-    int countRecords();
+
 
 }

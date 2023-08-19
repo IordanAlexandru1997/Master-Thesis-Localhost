@@ -95,33 +95,6 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    public SoBO getSoBO(String soboId, String uniqueField) {
-        try (Session session = driver.session()) {
-            StringBuilder queryBuilder = new StringBuilder();
-
-            queryBuilder.append("MATCH (s {");
-            queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
-            queryBuilder.append("}) RETURN s");
-
-            List<Record> records = session.run(queryBuilder.toString(), parameters(uniqueField, soboId)).list();
-
-            if (!records.isEmpty()) {
-                Record record = records.get(0);
-                Node node = record.get("s").asNode();
-                SoBO sobo = new SoBO();
-                sobo.setId(node.get("id").asString());
-                Map<String, Object> properties = new HashMap<>();
-                for (String key : node.keys()) {
-                    properties.put(key, node.get(key).asObject());
-                }
-                sobo.getProperties().putAll(properties);
-
-                return sobo;
-            }
-
-            return null;
-        }
-    }
     public void clearDatabase() {
         try (Session session = driver.session()) {
             String query = "MATCH (n) DETACH DELETE n";
@@ -140,7 +113,7 @@ public class Neo4jService implements DatabaseService {
 
         // Determine how many edges to generate for this SoBO
         int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-        System.out.println("numedges : "+ numEdges);
+//        System.out.println("numedges : "+ numEdges);
         for (int i = 0; i < numEdges; i++) {
             // Randomly select a previous SoBO to connect with
             SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
@@ -165,7 +138,7 @@ public class Neo4jService implements DatabaseService {
 
             // Pick a random custom ID
             String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-            System.out.println("Selected SoBO ID: " + randomSoBOId);  // Print the selected SoBO ID
+//            System.out.println("Selected SoBO ID: " + randomSoBOId);  // Print the selected SoBO ID
             if (isOptimizationEffective()) {
                 // Use Neo4j's API to retrieve a node using custom ID and its neighbors
                 String query = "MATCH (s {id: $id})-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) RETURN neighbor.id as neighborId, type(r) as relationshipType";
@@ -184,7 +157,7 @@ public class Neo4jService implements DatabaseService {
                     String relationshipType = record.get("relationshipType").asString();
                     neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
                 }
-                System.out.println(neighbors.toString());
+//                System.out.println(neighbors.toString());
             }
 
             else {
@@ -194,7 +167,7 @@ public class Neo4jService implements DatabaseService {
 
                 if (nodeResult.hasNext()) {
                     Node sobo = nodeResult.next().get("s").asNode();
-                    System.out.println("Selected SoBO with ID: " + sobo.id());  // This will display the default Neo4j node ID
+//                    System.out.println("Selected SoBO with ID: " + sobo.id());  // This will display the default Neo4j node ID
 
                     // Fetch the neighbors of the selected SoBO node considering all possible relationships
                     String neighborsQuery = "MATCH (s)-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) WHERE ID(s) = $id RETURN neighbor, type(r) as relationshipType";
@@ -208,7 +181,7 @@ public class Neo4jService implements DatabaseService {
                         neighbors.append("Neighbor ID: ").append(neighbor.id()).append(", Relationship: ").append(relationshipType).append("\n");
                     }
 
-                    System.out.println(neighbors.toString());
+//                    System.out.println(neighbors.toString());
                 } else {
                     System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
@@ -234,12 +207,12 @@ public class Neo4jService implements DatabaseService {
         soboIds.removeAll(updatedIds); // Remove already updated IDs
 
         if (soboIds.isEmpty()) {
-            System.out.println("All SoBOs have been updated.");
+//            System.out.println("All SoBOs have been updated.");
             return;
         }
 
         String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-        System.out.println("Selected ID for update: " + id);
+//        System.out.println("Selected ID for update: " + id);
 
         try (Session session = driver.session()) {
             StringBuilder queryBuilder = new StringBuilder();
@@ -251,7 +224,7 @@ public class Neo4jService implements DatabaseService {
             session.run(queryBuilder.toString(), parameters("id", id));
 
             updatedIds.add(id); // Add to updated IDs
-            System.out.println("Updated ID: " + id);
+//            System.out.println("Updated ID: " + id);
         }
     }
 
@@ -265,7 +238,7 @@ public class Neo4jService implements DatabaseService {
         }
 
         String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
-        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
+//        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
 
         try (Session session = driver.session()) {
             String query = "MATCH (s {id: $soboId}) DETACH DELETE s";
@@ -278,9 +251,6 @@ public class Neo4jService implements DatabaseService {
 
 
 
-    private String getRandomSoBOId() {
-        return SoBOGenerator.getRandomSoBOId();
-    }
     private String getRandomSoBOId(List<String> soboIds) {
         int randomIndex = new Random().nextInt(soboIds.size());
         return soboIds.get(randomIndex);
@@ -292,10 +262,6 @@ public class Neo4jService implements DatabaseService {
         benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
     }
 
-    @Override
-    public int countRecords() {
-        return 0;
-    }
 
 }
 
