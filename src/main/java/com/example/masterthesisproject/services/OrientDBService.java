@@ -29,6 +29,11 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.json.Json;
+import javax.json.JsonObjectBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
@@ -38,6 +43,7 @@ import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
 @Service
 @Lazy
 public class OrientDBService implements DatabaseService {
+    private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
 
     @Value("${orientdb.url}")
     private String ORIENTDB_URL;
@@ -117,6 +123,19 @@ public class OrientDBService implements DatabaseService {
         }
     }
 
+    private void logOperation(String operation, String message) {
+        try (FileWriter file = new FileWriter(OPERATIONAL_LOG_FILE, true)) {
+            JsonObjectBuilder logObjectBuilder = Json.createObjectBuilder();
+            logObjectBuilder.add("database", "OrientDB")
+                    .add("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+                    .add("details", Json.createObjectBuilder()
+                            .add("operation", operation)
+                            .add("message", message));
+            file.write(logObjectBuilder.build().toString() + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
         String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
@@ -211,7 +230,10 @@ public class OrientDBService implements DatabaseService {
                 }
             }
             db.commit();
+            logOperation("Create", "Created SoBO with ID: " + sobo.getId());
         }
+
+
     }
 
     @Override
@@ -274,7 +296,9 @@ public class OrientDBService implements DatabaseService {
                     }
                 }
             }
-        }
+        logOperation("Read", "Read SoBO with custom ID: " + randomSoBOId);
+
+    }
 
 
 
@@ -311,7 +335,8 @@ public class OrientDBService implements DatabaseService {
                 System.err.println("Vertex not found for ID: " + id);
             }
 
-        }
+        }        logOperation("Update", "Updated SoBO with ID: " + id);
+
     }
 
 
@@ -333,6 +358,8 @@ public class OrientDBService implements DatabaseService {
 //        System.out.println("SoBO deleted: " + id);
         soboIds.remove(id); // Remove the deleted ID from the list
         SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
+        logOperation("Delete", "Deleted SoBO with ID: " + id);
+
     }
 
 
@@ -351,11 +378,9 @@ public class OrientDBService implements DatabaseService {
     }
 
 
-
     @Override
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
-        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
-        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
+    public String getDatabaseName() {
+        return "OrientDB";
     }
 
 

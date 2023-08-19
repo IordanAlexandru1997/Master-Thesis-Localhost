@@ -1,51 +1,92 @@
 package com.example.masterthesisproject;
 
 
-import java.util.Random;
-public class DatabaseBenchmark {
-    private DatabaseService service;
-    private int numEntries;
+import com.example.masterthesisproject.services.ArangoDBService;
+import org.springframework.beans.factory.annotation.Value;
 
-    public DatabaseBenchmark(DatabaseService service, int numEntries) {
-        this.service = service;
-        this.numEntries = numEntries;
+import javax.json.Json;
+import javax.json.JsonObjectBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+public class DatabaseBenchmark {
+    private final DatabaseService service;
+    private final int numEntries;
+
+    @Value("${optimization.enabled}")
+    private boolean optimizationEnabled;
+
+    private Boolean uiOptimizationFlag = null;
+
+    public boolean isOptimizationEffective() {
+        return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
     }
 
+    public DatabaseBenchmark(DatabaseService service, int numEntries, boolean optimizeFlag) {
+        this.service = service;
+        this.numEntries = numEntries;
+        this.uiOptimizationFlag = optimizeFlag;
+    }
+
+    private void logOperation(String operation, int percent, double duration, int records, int minEdges, int maxEdges, FileWriter file) throws IOException {
+        JsonObjectBuilder logObjectBuilder = Json.createObjectBuilder();
+        logObjectBuilder.add("operationDetails", Json.createObjectBuilder()
+                .add("database_name", service.getDatabaseName())
+                .add("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+                .add("operation", operation)
+                .add("percent", percent)
+                .add("duration", duration)
+                .add("records", records)
+                .add("min_edges_per_node", minEdges)
+                .add("max_edges_per_node", maxEdges)
+                .add("optimization", isOptimizationEffective() ? "Yes" : "No"));
+        file.write(logObjectBuilder.build().toString() + "\n");
+    }
+
+
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete,
-                             int minEdgesPerNode, int maxEdgesPerNode) { // Added minEdgesPerNode and maxEdgesPerNode
+                             int minEdgesPerNode, int maxEdgesPerNode) {
+
         if (percentCreate != 0) {
-            System.out.println("Clearing SoBO File...");
             SoBOIdTracker.clearSoBOFile();
-
-            System.out.println("Clearing the database...");
             service.clearDatabase();
-            System.out.println("Database cleared.");
-        }
-        long startTime = System.nanoTime();
-
-        for (int i = 0; i < (numEntries * percentCreate / 100); i++) {
-            System.out.println("Creating SoBOs");
-            service.create(minEdgesPerNode, maxEdgesPerNode); // Pass the parameters here
         }
 
-        for (int i = 0; i < (numEntries * percentRead / 100); i++) {
-            System.out.println("Reading SoBOs");
-            service.read();
+        System.out.println("Starting operation timing for " + service.getDatabaseName());
+        try (FileWriter file = new FileWriter("template_timings.json", true)) {
+            Map<String, Runnable> operations = Map.of(
+                    "Create", () -> service.create(minEdgesPerNode, maxEdgesPerNode),
+                    "Read", service::read,
+                    "Update", service::update,
+                    "Delete", service::delete
+            );
+
+            Map<String, Integer> percentages = Map.of(
+                    "Create", percentCreate,
+                    "Read", percentRead,
+                    "Update", percentUpdate,
+                    "Delete", percentDelete
+            );
+
+            for (String operation : List.of("Create", "Read", "Update", "Delete")) {
+                int recordsAffected = numEntries * percentages.get(operation) / 100;
+
+                long startTime = System.nanoTime();
+                for (int i = 0; i < (numEntries * percentages.get(operation) / 100); i++) {
+                    operations.get(operation).run();
+                }
+                long endTime = System.nanoTime();
+                double duration = (endTime - startTime) / 1_000_000_000.0;
+                logOperation(operation, percentages.get(operation), duration, recordsAffected, minEdgesPerNode, maxEdgesPerNode, file);
+            }
+
+            System.out.println("Process finished.");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        for (int i = 0; i < (numEntries * percentUpdate / 100); i++) {
-            System.out.println("Updating SoBOs");
-            service.update();
-        }
-
-        for (int i = 0; i < (numEntries * percentDelete / 100); i++) {
-            System.out.println("Deleting SoBOs");
-            service.delete();
-        }
-
-        long endTime = System.nanoTime();
-
-        double duration = (endTime - startTime) / 1_000_000_000.0;
-        System.out.println("Total time taken: " + duration + " seconds");
     }
 }

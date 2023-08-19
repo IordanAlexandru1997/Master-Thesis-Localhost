@@ -1,5 +1,6 @@
 package com.example.masterthesisproject.controllers;
 
+import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.services.ArangoDBService;
 import com.example.masterthesisproject.services.Neo4jService;
 import com.example.masterthesisproject.services.OrientDBService;
@@ -42,16 +43,18 @@ public class BenchmarkController {
         neo4jService.setUiOptimizationFlag(optimizeFlag);
         orientDBService.setUiOptimizationFlag(optimizeFlag);
         arangoDBService.setUiOptimizationFlag(optimizeFlag);
-
         switch (database) {
             case "Neo4j":
-                neo4jService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
+                new DatabaseBenchmark(neo4jService, numEntries, optimizeFlag)
+                        .runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
                 break;
             case "OrientDB":
-                orientDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
+                new DatabaseBenchmark(orientDBService, numEntries, optimizeFlag)
+                        .runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
                 break;
             case "ArangoDB":
-                arangoDBService.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, numEntries, minEdgesPerNode, maxEdgesPerNode);
+                new DatabaseBenchmark(arangoDBService, numEntries, optimizeFlag)
+                        .runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
                 break;
         }
 

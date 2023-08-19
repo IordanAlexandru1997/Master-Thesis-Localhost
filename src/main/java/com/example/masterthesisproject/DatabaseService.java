@@ -6,7 +6,6 @@ public interface DatabaseService {
     void update(); // Add percentage parameter here
     void delete();
     void clearDatabase();
-    void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdges, int maxEdges);
-
+    String getDatabaseName();
 
 }

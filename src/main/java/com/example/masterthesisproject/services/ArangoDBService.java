@@ -1,10 +1,12 @@
 package com.example.masterthesisproject.services;
 import com.arangodb.*;
 import com.arangodb.entity.BaseEdgeDocument;
+import com.arangodb.entity.EdgeDefinition;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
 
 import com.arangodb.entity.BaseDocument;
+import com.arangodb.model.GraphCreateOptions;
 import com.arangodb.model.HashIndexOptions;
 import com.arangodb.util.MapBuilder;
 import com.example.masterthesisproject.DatabaseBenchmark;
@@ -15,8 +17,17 @@ import com.example.masterthesisproject.entities.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import java.io.FileWriter;
+import java.io.IOException;
+import javax.json.Json;
+
+
 
 import javax.annotation.PostConstruct;
+import javax.json.JsonObjectBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
@@ -48,6 +59,7 @@ public class ArangoDBService implements DatabaseService {
     private ArangoDB arangoDB;
     private ArangoDatabase database;
     private Boolean uiOptimizationFlag = null;
+    private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
 
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
@@ -63,16 +75,49 @@ public class ArangoDBService implements DatabaseService {
                 .password(ARANGO_DB_PASSWORD)
                 .build();
         database = arangoDB.db(DB_NAME);
-        ArangoCollection collection = arangoDB.db(DB_NAME).collection(COLLECTION_NAME);
-        if (!collection.exists()) {
-            arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
+
+        // Ensure SoBO collection exists
+        ArangoCollection soboCollection = database.collection("SoBO");
+        if (!soboCollection.exists()) {
+            database.createCollection("SoBO");
+        }
+
+        // Ensure edgeCollection exists
+        if (!database.collection("edgeCollection").exists()) {
+            CollectionCreateOptions options = new CollectionCreateOptions();
+            options.type(CollectionType.EDGES);
+            database.createCollection("edgeCollection", options);
+        }
+
+        // Ensure sobo_graph exists
+        ArangoGraph graph = database.graph("sobo_graph");
+        if (!graph.exists()) {
+            GraphCreateOptions graphOptions = new GraphCreateOptions();
+            graph.create(Collections.singletonList(new EdgeDefinition()
+                    .collection("edgeCollection")
+                    .from("SoBO")
+                    .to("SoBO")), graphOptions);
         }
         if (isOptimizationEffective()) {
             // Create index on 'id' attribute
-            collection.ensureHashIndex(List.of("id"), new HashIndexOptions());
+            soboCollection.ensureHashIndex(List.of("id"), new HashIndexOptions());
         }
     }
 
+
+    private void logOperation(String operation, String message) {
+        try (FileWriter file = new FileWriter(OPERATIONAL_LOG_FILE, true)) {
+            JsonObjectBuilder logObjectBuilder = Json.createObjectBuilder();
+            logObjectBuilder.add("database", "ArangoDB")
+                    .add("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+                    .add("details", Json.createObjectBuilder()
+                            .add("operation", operation)
+                            .add("message", message));
+            file.write(logObjectBuilder.build().toString() + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void addSoBO(SoBO sobo, String keyAttr) {
         // Define a document
@@ -85,8 +130,10 @@ public class ArangoDBService implements DatabaseService {
         } else {
             database.collection("SoBO").insertDocument(soboDoc);
         }
-    }
+        logOperation("Create", "Added a new SoBO with ID: " + sobo.getId());
 
+
+    }
     public void createEdge(Edge edge, String edgeCollectionName) {
         // Check if Edge collection exists and create it if not
         if (!database.collection(edgeCollectionName).exists()) {
@@ -95,13 +142,21 @@ public class ArangoDBService implements DatabaseService {
             database.createCollection(edgeCollectionName, options);
         }
 
-        // Create Edge document
-        String edgeKey = UUID.randomUUID().toString();
-//        System.out.println("Generated edgeKey: " + edgeKey);  // Log the generated edgeKey
-
         String id1 = (String) edge.getSoboObj1().getProperties().get("id");
         String id2 = (String) edge.getSoboObj2().getProperties().get("id");
 
+        // Check if an edge already exists between the two SoBOs
+        String query = "FOR edge IN @@collectionName FILTER edge._from == @sourceId AND edge._to == @targetId RETURN edge";
+        Map<String, Object> bindVars = Map.of("@collectionName", edgeCollectionName, "sourceId", "SoBO/" + id1, "targetId", "SoBO/" + id2);
+        ArangoCursor<BaseEdgeDocument> cursor = database.query(query, bindVars, null, BaseEdgeDocument.class);
+
+        if (cursor.hasNext()) {
+            // Edge already exists, return without creating a new edge
+            return;
+        }
+
+        // Create Edge document
+        String edgeKey = UUID.randomUUID().toString();
         Map<String, Object> properties = edge.getProperties();
         if(properties == null) {
             properties = new HashMap<>();
@@ -112,10 +167,8 @@ public class ArangoDBService implements DatabaseService {
 
         BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
         if (existingEdge != null) {
-//            System.out.println("Edge with edgeKey already exists, updating: " + edgeKey);
             database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
         } else {
-//            System.out.println("Creating new Edge with edgeKey: " + edgeKey);
             database.collection(edgeCollectionName).insertDocument(edgeDoc);
         }
 
@@ -123,12 +176,8 @@ public class ArangoDBService implements DatabaseService {
         if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
+        logOperation("Create", "Created a new Edge with key: " + edgeKey);
     }
-//    public void clearDatabase() {
-//        if (database.collection("SoBO").exists()) {
-//            database.collection("SoBO").truncate();
-//        }
-//    }
 
     @Override
     public void clearDatabase() {
@@ -137,11 +186,13 @@ public class ArangoDBService implements DatabaseService {
         }
         arangoDB.createDatabase(DB_NAME);
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
+        init();
     }
 
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
         // Create and add SoBO
+
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
         GENERATED_SoBOs.add(sobo);
@@ -162,84 +213,65 @@ public class ArangoDBService implements DatabaseService {
             }
         }
     }
-
     @Override
     public void read() {
-        // Load the custom IDs from sobo_obj.json
         List<String> soboIds = SoBOIdTracker.loadSoBOIds();
         if (soboIds.isEmpty()) {
             System.err.println("No SoBOs have been generated.");
             return;
         }
-        // Pick a random custom ID
         String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-        // Use the picked custom ID to fetch the node
+
+        StringBuilder neighbors = new StringBuilder();
 
         if (isOptimizationEffective()) {
-//            System.out.println("Reading SoBOs");
-//            System.out.println("Selected SoBO with ID: SoBO/" + randomSoBOId);
-
-            // Use AQL to perform graph traversal to get vertex and its neighbors
-            String query = "FOR vertex IN 1..1 OUTBOUND @startVertex GRAPH @graphName RETURN vertex";
+            String neighborsQuery = "FOR neighbor, edge IN 1..1 OUTBOUND @startVertex GRAPH @graphName " +
+                    "RETURN {neighbor: neighbor, relationshipType: edge.type}";
             Map<String, Object> bindVars = new HashMap<>();
             bindVars.put("startVertex", "SoBO/" + randomSoBOId);
             bindVars.put("graphName", "sobo_graph");
-
-            // Execute the query on the ArangoDatabase instance
-            ArangoCursor<BaseDocument> cursor = database.query(query, bindVars, null, BaseDocument.class);
-
-            StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-            cursor.forEachRemaining(document -> {
-                if (document != null) {
-                    neighbors.append("Neighbor ID: ").append(document.getKey()).append("\n");
-                } else {
-                    System.err.println("Encountered a null vertex in the result set.");
+            ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
+            while (neighborsResult.hasNext()) {
+                HashMap<String, Object> record = neighborsResult.next();
+                if (record != null && record.containsKey("neighbor")) {
+                    HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
+                    if (neighborMap != null) {
+                        String relationshipType = (String) record.get("relationshipType");
+                        String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
+                        neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                    }
                 }
-            });
-//            System.out.println(neighbors.toString());
-        } else {
+            }
+        }  else {
             String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
             Map<String, Object> bindVars = new HashMap<>();
             bindVars.put("id", randomSoBOId);
             ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
             if (nodeResult.hasNext()) {
                 BaseDocument sobo = nodeResult.next();
-//                System.out.println("Selected SoBO with ID: " + sobo.getId());
-                // Fetch the neighbors of the selected SoBO node considering all possible relationships
                 String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
                 bindVars = new MapBuilder().put("id", sobo.getId()).get();
                 ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
-                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
                 while (neighborsResult.hasNext()) {
                     HashMap<String, Object> record = neighborsResult.next();
-
-                    // Check if the record is not null and contains the "neighbor" key
                     if (record != null && record.containsKey("neighbor")) {
                         HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
-
-                        // Ensure that the neighborMap is not null before attempting to retrieve values from it
                         if (neighborMap != null) {
-                            BaseDocument neighbor = new BaseDocument();
-                            neighbor.setKey((String) neighborMap.get("_key"));
-                            neighbor.setId((String) neighborMap.get("_id"));
-                            neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
-
                             String relationshipType = (String) record.get("relationshipType");
-
-                            // Crop the "SoBO/" prefix from the neighbor ID
-                            String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
-
+                            String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
                             neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
                         }
                     }
                 }
-
-//                System.out.println(neighbors.toString());
             } else {
                 System.err.println("No SoBO found for custom ID: " + randomSoBOId);
             }
         }
+
+        logOperation("Read", "Selected SoBO with ID: " + randomSoBOId + "; Neighbors: " + neighbors.toString());
+
     }
+
     private final List<String> updatedIds = new ArrayList<>();
     public String getRandomSoBOId(List<String> soboIds) {
         if (soboIds.isEmpty()) {
@@ -287,6 +319,7 @@ public class ArangoDBService implements DatabaseService {
         } catch (ArangoDBException e) {
             throw new RuntimeException("Failed to update Document with key: " + id, e);
         }
+        logOperation("Update", "Updated SoBO with ID: " + id);
     }
 
 
@@ -316,13 +349,14 @@ public class ArangoDBService implements DatabaseService {
 
         soboIds.remove(soboIdToDelete);
         SoBOIdTracker.saveSoBOIds(soboIds);
+        logOperation("Delete", "Deleted SoBO with ID: " + soboIdToDelete);
+
     }
 
 
     @Override
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
-        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
-        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
+    public String getDatabaseName() {
+        return "ArangoDB";
     }
 
 
