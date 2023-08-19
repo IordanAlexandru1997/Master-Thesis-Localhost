@@ -1,13 +1,11 @@
 package com.example.masterthesisproject.services;
-import com.arangodb.ArangoCursor;
-import com.arangodb.ArangoDBException;
+import com.arangodb.*;
 import com.arangodb.entity.BaseEdgeDocument;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
 
-import com.arangodb.ArangoDB;
-import com.arangodb.ArangoDatabase;
 import com.arangodb.entity.BaseDocument;
+import com.arangodb.model.HashIndexOptions;
 import com.arangodb.util.MapBuilder;
 import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
@@ -43,8 +41,10 @@ public class ArangoDBService implements DatabaseService {
 
     @Value("${arangodb.dbname}")
     private String DB_NAME;
-
-
+    @Value("${optimization.enabled}")
+    private boolean optimizationEnabled;
+    @Value("${arangodb.collection}")
+    private String COLLECTION_NAME;
     private ArangoDB arangoDB;
     private ArangoDatabase database;
 
@@ -56,6 +56,14 @@ public class ArangoDBService implements DatabaseService {
                 .password(ARANGO_DB_PASSWORD)
                 .build();
         database = arangoDB.db(DB_NAME);
+        ArangoCollection collection = arangoDB.db(DB_NAME).collection(COLLECTION_NAME);
+        if (!collection.exists()) {
+            arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
+        }
+        if (optimizationEnabled) {
+            // Create index on 'id' attribute
+            collection.ensureHashIndex(List.of("id"), new HashIndexOptions());
+        }
     }
 
 
@@ -154,51 +162,64 @@ public class ArangoDBService implements DatabaseService {
         // Pick a random custom ID
         String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
 
-        // Use the picked custom ID to fetch the node
-        String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
-        Map<String, Object> bindVars = new HashMap<>();
-        bindVars.put("id", randomSoBOId);
-        ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
+        // Get the ArangoDatabase instance
+        ArangoDatabase database = arangoDB.db(DB_NAME);
 
+        if (optimizationEnabled) {
+            // Use AQL to perform graph traversal to get vertex and its neighbors
+            String query = "FOR vertex IN 1..1 OUTBOUND @startVertex GRAPH @graphName RETURN vertex";
+            Map<String, Object> bindVars = new HashMap<>();
+            bindVars.put("startVertex", "SoBOCollection/" + randomSoBOId);
+            bindVars.put("graphName", "sobo_graph");
 
-        if (nodeResult.hasNext()) {
-            BaseDocument sobo = nodeResult.next();
-            System.out.println("Selected SoBO with ID: " + sobo.getId());
+            // Execute the query on the ArangoDatabase instance
+            ArangoCursor<BaseDocument> cursor = database.query(query, bindVars, null, BaseDocument.class);
+            cursor.forEachRemaining(document -> {
+                System.out.println("Vertex ID: " + document.getKey());
+                // ... process the document or print additional details
+            });
+        } else {
+            // Use the picked custom ID to fetch the node
+            String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
+            Map<String, Object> bindVars = new HashMap<>();
+            bindVars.put("id", randomSoBOId);
+            ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
 
-            // Fetch the neighbors of the selected SoBO node considering all possible relationships
-            String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
-            bindVars = new MapBuilder().put("id", sobo.getId()).get();
-            ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
+            if (nodeResult.hasNext()) {
+                BaseDocument sobo = nodeResult.next();
+                System.out.println("Selected SoBO with ID: " + sobo.getId());
 
-            StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-            while (neighborsResult.hasNext()) {
-                HashMap<String, Object> record = neighborsResult.next();
+                // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
+                bindVars = new HashMap<>();
+                bindVars.put("id", sobo.getId());
+                ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
 
-                // Check if the record is not null and contains the "neighbor" key
-                if (record != null && record.containsKey("neighbor")) {
-                    HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
+                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+                while (neighborsResult.hasNext()) {
+                    HashMap<String, Object> record = neighborsResult.next();
 
-                    // Ensure that the neighborMap is not null before attempting to retrieve values from it
-                    if (neighborMap != null) {
-                        BaseDocument neighbor = new BaseDocument();
-                        neighbor.setKey((String) neighborMap.get("_key"));
-                        neighbor.setId((String) neighborMap.get("_id"));
-                        neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
+                    if (record != null && record.containsKey("neighbor")) {
+                        HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
 
-                        String relationshipType = (String) record.get("relationshipType");
+                        if (neighborMap != null) {
+                            BaseDocument neighbor = new BaseDocument();
+                            neighbor.setKey((String) neighborMap.get("_key"));
+                            neighbor.setId((String) neighborMap.get("_id"));
+                            neighbor.setProperties((Map<String, Object>) neighborMap.get("properties"));
 
-                        // Crop the "SoBO/" prefix from the neighbor ID
-                        String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
+                            String relationshipType = (String) record.get("relationshipType");
+                            String croppedNeighborId = neighbor.getId().replace("SoBO/", "");
 
-                        neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                            neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                        }
                     }
                 }
+
+                System.out.println(neighbors.toString());
+            } else {
+                System.err.println("No SoBO found for custom ID: " + randomSoBOId);
             }
-
-            System.out.println(neighbors.toString());
-
-        } else {
-            System.err.println("No SoBO found for custom ID: " + randomSoBOId);
         }
     }
 

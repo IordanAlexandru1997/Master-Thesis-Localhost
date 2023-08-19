@@ -10,6 +10,7 @@ import org.neo4j.driver.*;
 import org.neo4j.driver.types.Node;
 import org.neo4j.driver.Record;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -35,13 +36,24 @@ public class Neo4jService implements DatabaseService {
     @org.springframework.beans.factory.annotation.Value("${neo4j.password}")
     private String PASSWORD;
 
+    @Value("${optimization.enabled}")
+    private boolean optimizationEnabled;
     private Driver driver;
 
     @PostConstruct
     public void init() {
         driver = GraphDatabase.driver(NEO4J_URL, AuthTokens.basic(USERNAME, PASSWORD));
+
+        try (Session session = driver.session()) {
+            if (optimizationEnabled) {
+                // Create an index on the id property of the SoBO nodes for faster lookup if optimization is enabled.
+                String createIndexQuery = "CREATE INDEX sobo_id_index FOR (n:SoBO) ON (n.id)";
+                session.run(createIndexQuery);
+            }
+        }
     }
-//    Updates from 24.07.2023 meeting SoBO
+
+
 
 
     public void addSoBO(SoBO soboObj, String uniqueField) {
@@ -148,33 +160,45 @@ public class Neo4jService implements DatabaseService {
             // Pick a random custom ID
             String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
 
-            // Use the picked custom ID to fetch the node
-            String nodeQuery = "MATCH (s {id: $id}) RETURN s";
-            Result nodeResult = session.run(nodeQuery, parameters("id", randomSoBOId));
+            if (optimizationEnabled) {
+                // Use Neo4j's API to retrieve a node using custom ID and its neighbors
+                String query = "MATCH (s:SoBO {id: $id})-[:RELATED_TO|:FRIENDS_WITH|:WORKS_WITH]-(neighbor) RETURN neighbor.id as neighborId";
+                Map<String, Object> parameters = Collections.singletonMap("id", randomSoBOId);
 
-            if (nodeResult.hasNext()) {
-                Node sobo = nodeResult.next().get("s").asNode();
-                System.out.println("Selected SoBO with ID: " + sobo.id());  // This will display the default Neo4j node ID
-
-                // Fetch the neighbors of the selected SoBO node considering all possible relationships
-                String neighborsQuery = "MATCH (s)-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) WHERE ID(s) = $id RETURN neighbor, type(r) as relationshipType";
-                Result neighborsResult = session.run(neighborsQuery, parameters("id", sobo.id()));
-
-                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-                while (neighborsResult.hasNext()) {
-                    Record record = neighborsResult.next();
-                    Node neighbor = record.get("neighbor").asNode();
-                    String relationshipType = record.get("relationshipType").asString();
-                    neighbors.append("Neighbor ID: ").append(neighbor.id()).append(", Relationship: ").append(relationshipType).append("\n");
+                Result resultSet = session.run(query, parameters);
+                while (resultSet.hasNext()) {
+                    Record record = resultSet.next();
+                    System.out.println("Neighbor ID: " + record.get("neighborId").asString());
                 }
-
-                System.out.println(neighbors.toString());
-
             } else {
-                System.err.println("No SoBO found for custom ID: " + randomSoBOId);
+                // Use the picked custom ID to fetch the node
+                String nodeQuery = "MATCH (s {id: $id}) RETURN s";
+                Result nodeResult = session.run(nodeQuery, parameters("id", randomSoBOId));
+
+                if (nodeResult.hasNext()) {
+                    Node sobo = nodeResult.next().get("s").asNode();
+                    System.out.println("Selected SoBO with ID: " + sobo.id());  // This will display the default Neo4j node ID
+
+                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                    String neighborsQuery = "MATCH (s)-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) WHERE ID(s) = $id RETURN neighbor, type(r) as relationshipType";
+                    Result neighborsResult = session.run(neighborsQuery, parameters("id", sobo.id()));
+
+                    StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+                    while (neighborsResult.hasNext()) {
+                        Record record = neighborsResult.next();
+                        Node neighbor = record.get("neighbor").asNode();
+                        String relationshipType = record.get("relationshipType").asString();
+                        neighbors.append("Neighbor ID: ").append(neighbor.id()).append(", Relationship: ").append(relationshipType).append("\n");
+                    }
+
+                    System.out.println(neighbors.toString());
+                } else {
+                    System.err.println("No SoBO found for custom ID: " + randomSoBOId);
+                }
             }
         }
     }
+
 
 
 

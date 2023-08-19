@@ -29,13 +29,13 @@ public class BenchmarkController {
 
     @PostMapping("/runBenchmark")
     public String runBenchmark(@RequestParam String database,
-                               @RequestParam int percentCreate,
-                               @RequestParam int percentRead,
-                               @RequestParam int percentUpdate,
-                               @RequestParam int percentDelete,
-                               @RequestParam int numEntries,
-                               @RequestParam int minEdgesPerNode,
-                               @RequestParam int maxEdgesPerNode,
+                               @RequestParam(defaultValue = "0") int percentCreate,
+                               @RequestParam(defaultValue = "0") int percentRead,
+                               @RequestParam(defaultValue = "0") int percentUpdate,
+                               @RequestParam(defaultValue = "0") int percentDelete,
+                               @RequestParam(defaultValue = "0") int numEntries,
+                               @RequestParam(defaultValue = "0") int minEdgesPerNode,
+                               @RequestParam(defaultValue = "0") int maxEdgesPerNode,
                                Model model) {
 
         switch (database) {

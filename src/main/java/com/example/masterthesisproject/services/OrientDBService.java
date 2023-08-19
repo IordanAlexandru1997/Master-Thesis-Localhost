@@ -12,8 +12,10 @@ import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 import com.orientechnologies.orient.core.id.ORID;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
+import com.orientechnologies.orient.core.record.ODirection;
 import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.OCommandSQL;
@@ -48,7 +50,8 @@ public class OrientDBService implements DatabaseService {
 
     @Value("${orientdb.password}")
     private String PASSWORD;
-
+    @Value("${optimization.enabled}")
+    private boolean optimizationEnabled;
     Logger logger = LoggerFactory.getLogger(OrientDBService.class);
     private OrientDB orientDB;
     private ODatabaseSession dbSession;
@@ -68,9 +71,7 @@ public class OrientDBService implements DatabaseService {
         }
         setupSchema();
     }
-
     private void setupSchema() {
-
         if (!orientDB.exists(DATABASE_NAME)) {
             orientDB.create(DATABASE_NAME, ODatabaseType.PLOCAL);
         }
@@ -80,9 +81,18 @@ public class OrientDBService implements DatabaseService {
         if (dbSession.getClass("SoBO") == null) {
             OClass soboClass = dbSession.createClass("SoBO");
             soboClass.createProperty("id", OType.STRING);
-            soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
+
+            // Only create index in optimized mode
+            if (optimizationEnabled) {
+                soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
+                logger.info("Optimized index SoBO_ID_IDX created on SoBO class.");
+            } else {
+                logger.info("Running in non-optimized mode. No index created on SoBO class.");
+            }
+
             logger.info("SoBO vertex class created");
         }
+
         if (dbSession.getClass("WORKS_WITH") == null) {
             dbSession.createClass("WORKS_WITH", "E");
             logger.info("WORKS_WITH edge class created");
@@ -96,6 +106,7 @@ public class OrientDBService implements DatabaseService {
             logger.info("RELATED_WITH edge class created");
         }
     }
+
 
 
     public void addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
@@ -228,33 +239,49 @@ public class OrientDBService implements DatabaseService {
 
         // Pick a random custom ID
         String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-
-        // Use the picked custom ID to fetch the node
-        String nodeQuery = "SELECT FROM V WHERE id = ?";
-        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
-
-            if (nodeResult.hasNext()) {
-                OResult sobo = nodeResult.next();
-                System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
-
-                // Fetch the neighbors of the selected SoBO node considering all possible relationships
-                String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
-
-                OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
-
-                StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-                while (neighborsResult.hasNext()) {
-                    OResult record = neighborsResult.next();
-                    String neighborId = record.getProperty("id");
-                    String relationshipType = record.getProperty("@class");
-                    neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+        if (optimizationEnabled) {
+            // Use OrientDB's graph API to retrieve a vertex using custom ID and its neighbors
+            String query = "SELECT FROM SoBO WHERE id = ?";
+            OResultSet resultSet = dbSession.query(query, randomSoBOId);
+            OVertex soboVertex = null;
+            if (resultSet.hasNext()) {
+                soboVertex = resultSet.next().getVertex().orElse(null);
+            }
+            if (soboVertex != null) {
+                Iterable<OVertex> neighbors = soboVertex.getVertices(ODirection.OUT);
+                for (OVertex neighbor : neighbors) {
+                    System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
                 }
+            }
+        }else {
+            // Non-optimized method (existing approach)
+            // Use the picked custom ID to fetch the node
+            String nodeQuery = "SELECT FROM V WHERE id = ?";
+            try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+                OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
 
-                System.out.println(neighbors.toString());
+                if (nodeResult.hasNext()) {
+                    OResult sobo = nodeResult.next();
+                    System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
 
-            } else {
-                System.err.println("No SoBO found for custom ID: " + randomSoBOId);
+                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                    String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
+
+                    OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
+
+                    StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
+                    while (neighborsResult.hasNext()) {
+                        OResult record = neighborsResult.next();
+                        String neighborId = record.getProperty("id");
+                        String relationshipType = record.getProperty("@class");
+                        neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                    }
+
+                    System.out.println(neighbors.toString());
+
+                } else {
+                    System.err.println("No SoBO found for custom ID: " + randomSoBOId);
+                }
             }
         }
     }

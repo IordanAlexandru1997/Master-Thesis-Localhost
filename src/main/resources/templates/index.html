@@ -1,44 +1,100 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Benchmark Tool</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </head>
 <body>
 
-<h1>Benchmark Configuration</h1>
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Benchmark Configuration</h1>
+    <form th:action="@{/runBenchmark}" method="post" class="bg-light p-4 rounded">
 
-<form action="#" th:action="@{/runBenchmark}" method="post">
-    <label for="database">Select Database:</label>
-    <select id="database" name="database">
-        <option value="Neo4j">Neo4j</option>
-        <option value="OrientDB">OrientDB</option>
-        <option value="ArangoDB">ArangoDB</option>
-    </select><br><br>
+        <div class="form-group">
+            <label for="database">Select Database:</label>
+            <select class="form-control" id="database" name="database">
+                <option value="Neo4j">Neo4j</option>
+                <option value="OrientDB">OrientDB</option>
+                <option value="ArangoDB">ArangoDB</option>
+            </select>
+        </div>
 
-    <label for="percentCreate">Percent Create:</label>
-    <input type="number" id="percentCreate" name="percentCreate"><br><br>
+        <!-- CRD Operations -->
+        <div class="form-group">
+            <label for="percentCreate">Percent Create:</label>
+            <input type="number" class="form-control" id="percentCreate" name="percentCreate">
+        </div>
 
-    <label for="percentRead">Percent Read:</label>
-    <input type="number" id="percentRead" name="percentRead"><br><br>
+        <div class="form-group d-none" id="minMaxDiv">
+            <label for="minEdgesPerNode">Min Edges Per Node:</label>
+            <input type="number" class="form-control mb-3" id="minEdgesPerNode" name="minEdgesPerNode">
 
-    <label for="percentUpdate">Percent Update:</label>
-    <input type="number" id="percentUpdate" name="percentUpdate"><br><br>
+            <label for="maxEdgesPerNode">Max Edges Per Node:</label>
+            <input type="number" class="form-control" id="maxEdgesPerNode" name="maxEdgesPerNode">
+        </div>
 
-    <label for="percentDelete">Percent Delete:</label>
-    <input type="number" id="percentDelete" name="percentDelete"><br><br>
+        <div class="form-group">
+            <label for="percentRead">Percent Read:</label>
+            <input type="number" class="form-control" id="percentRead" name="percentRead">
+        </div>
 
-    <label for="numEntries">Number of Entries:</label>
-    <input type="number" id="numEntries" name="numEntries"><br><br>
-    <label for="minEdgesPerNode">Min Edges Per Node:</label>
-    <input type="number" id="minEdgesPerNode" name="minEdgesPerNode"><br><br>
+        <div class="form-group">
+            <label for="percentUpdate">Percent Update:</label>
+            <input type="number" class="form-control" id="percentUpdate" name="percentUpdate">
+        </div>
 
-    <label for="maxEdgesPerNode">Max Edges Per Node:</label>
-    <input type="number" id="maxEdgesPerNode" name="maxEdgesPerNode"><br><br>
+        <div class="form-group">
+            <label for="percentDelete">Percent Delete:</label>
+            <input type="number" class="form-control" id="percentDelete" name="percentDelete">
+        </div>
 
-    <input type="submit" value="Run Benchmark">
-</form>
+        <div class="form-group">
+            <label for="numEntries">Number of Entries:</label>
+            <input type="number" class="form-control" id="numEntries" name="numEntries">
+        </div>
 
-<h2 th:text="${message}"></h2>
+        <button type="submit" class="btn btn-primary">Run Benchmark</button>
+    </form>
+
+    <h2 class="mt-5" th:text="${message}"></h2>
+</div>
+
+<script>
+    // Show Min and Max fields when a value is entered in the Percent Create field
+    $('#percentCreate').on('input', function() {
+        if ($(this).val()) {
+            $('#minMaxDiv').removeClass('d-none');
+        } else {
+            $('#minMaxDiv').addClass('d-none');
+        }
+    });
+    $(document).ready(function() {
+        // Show Min and Max fields when a value is entered in the Percent Create field
+        $('#percentCreate').on('input', function() {
+            if ($(this).val()) {
+                $('#minMaxDiv').removeClass('d-none');
+            } else {
+                $('#minMaxDiv').addClass('d-none');
+            }
+        });
+
+        // Before form submission, set empty CRUD input fields to 0
+        $('form').on('submit', function() {
+            ['percentCreate', 'percentRead', 'percentUpdate', 'percentDelete'].forEach(function(id) {
+                var input = $('#' + id);
+                if (!input.val()) {
+                    input.val(0);
+                }
+            });
+        });
+    });
+
+</script>
 
 </body>
 </html>
