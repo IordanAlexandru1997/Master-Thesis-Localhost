@@ -150,38 +150,12 @@ public class OrientDBService implements DatabaseService {
         db.commit();
     }
 
-    public void createEdgeWithSession(Edge edge, String id, ODatabaseSession db) {
-        OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
-        OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
-        OEdge existingEdge = null;
-        try (OResultSet rs = db.query(
-                "SELECT FROM (TRAVERSE bothE() FROM ?) WHERE @class = ? AND in.@rid = ? AND out.@rid = ?",
-                sobo1Vertex.getIdentity(), edge.getType(), sobo2Vertex.getIdentity(), sobo1Vertex.getIdentity())) {
-            if (rs.hasNext()) {
-                existingEdge = rs.next().getEdge().get();
-            }
-        }
-
-        if (existingEdge == null) {
-            existingEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
-        }
-
-        if (edge.getProperties() != null) {
-            for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
-                existingEdge.setProperty(entry.getKey(), entry.getValue());
-            }
-        }
-
-        existingEdge.save();
-    }
     @Override
     public void clearDatabase() {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             db.command("DELETE VERTEX SoBO");
         }
     }
-
-
 
     private OVertex getOrCreateVertex(SoBO sobo, ODatabaseSession db) {
         OVertex vertex;
@@ -205,7 +179,6 @@ public class OrientDBService implements DatabaseService {
 
         return vertex;
     }
-
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
@@ -215,19 +188,46 @@ public class OrientDBService implements DatabaseService {
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
 
-            int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-            for (int i = 0; i < numEdges; i++) {
+            int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+            int edgesCreated = 0;
+            int maxAttempts = GENERATED_SoBOs.size() * 2;  // Arbitrarily chosen, can be adjusted
+            int attempts = 0;
+
+            while (edgesCreated < numEdgesToCreate && attempts < maxAttempts) {
                 SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+
                 if (!sobo.equals(targetSoBO)) {
                     Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                    createEdgeWithSession(edge, "edgeCollection", db);
+                    OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
+                    OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
+
+                    // Check if edge exists
+                    boolean edgeExists = false;
+                    try (OResultSet rs = db.query(
+                            "SELECT FROM E WHERE out = ? AND in = ? AND @class = ?",
+                            sobo1Vertex.getIdentity(), sobo2Vertex.getIdentity(), edge.getType())) {
+                        if (rs.hasNext()) {
+                            edgeExists = true;
+                        }
+                    }
+
+                    // If edge doesn't exist, create it
+                    if (!edgeExists) {
+                        OEdge createdEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
+                        if (edge.getProperties() != null) {
+                            for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
+                                createdEdge.setProperty(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        createdEdge.save();
+                        edgesCreated++;
+                    }
                 }
+                attempts++;
             }
             db.commit();
             logOperation("Create", "Created SoBO with ID: " + sobo.getId());
         }
-
-
     }
 
     @Override

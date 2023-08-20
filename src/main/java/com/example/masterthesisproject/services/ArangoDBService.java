@@ -141,41 +141,32 @@ public class ArangoDBService implements DatabaseService {
             database.createCollection(edgeCollectionName, options);
         }
 
-        String id1 = (String) edge.getSoboObj1().getProperties().get("id");
-        String id2 = (String) edge.getSoboObj2().getProperties().get("id");
+        String id1 = "SoBO/" + edge.getSoboObj1().getProperties().get("id");
+        String id2 = "SoBO/" + edge.getSoboObj2().getProperties().get("id");
 
         // Check if an edge already exists between the two SoBOs
         String query = "FOR edge IN @@collectionName FILTER edge._from == @sourceId AND edge._to == @targetId RETURN edge";
-        Map<String, Object> bindVars = Map.of("@collectionName", edgeCollectionName, "sourceId", "SoBO/" + id1, "targetId", "SoBO/" + id2);
+        Map<String, Object> bindVars = Map.of("@collectionName", edgeCollectionName, "sourceId", id1, "targetId", id2);
         ArangoCursor<BaseEdgeDocument> cursor = database.query(query, bindVars, null, BaseEdgeDocument.class);
 
+        BaseEdgeDocument edgeDoc;
         if (cursor.hasNext()) {
-            // Edge already exists, return without creating a new edge
-            return;
-        }
-
-        // Create Edge document
-        String edgeKey = UUID.randomUUID().toString();
-        Map<String, Object> properties = edge.getProperties();
-        if(properties == null) {
-            properties = new HashMap<>();
-        }
-        BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
-        edgeDoc.setKey(edgeKey);
-        edgeDoc.setProperties(properties);
-
-        BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
-        if (existingEdge != null) {
-            database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
+            // If edge already exists, update its properties
+            edgeDoc = cursor.next();
+            edgeDoc.setProperties(edge.getProperties());
+            database.collection(edgeCollectionName).updateDocument(edgeDoc.getKey(), edgeDoc);
         } else {
+            // Create Edge document
+            edgeDoc = new BaseEdgeDocument(id1, id2);
+            edgeDoc.setProperties(edge.getProperties());
             database.collection(edgeCollectionName).insertDocument(edgeDoc);
         }
 
-        // Throw an exception if the edge could not be created
-        if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
-            throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
+        // Throw an exception if the edge could not be created/updated
+        if (database.collection(edgeCollectionName).getDocument(edgeDoc.getKey(), BaseEdgeDocument.class) == null) {
+            throw new RuntimeException("Could not create/update Edge document with key: " + edgeDoc.getKey());
         }
-        logOperation("Create", "Created a new Edge with key: " + edgeKey);
+        logOperation("Create", "Created/Updated a new Edge with key: " + edgeDoc.getKey());
     }
 
     @Override

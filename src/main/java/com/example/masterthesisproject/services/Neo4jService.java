@@ -99,25 +99,61 @@ public class Neo4jService implements DatabaseService {
             String query = "MATCH (n) DETACH DELETE n";
             session.run(query);
         }
+
     }
-    @Override
-    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
-        SoBO sobo = SoBOGenerator.generateRandomSoBO();
-        addSoBO(sobo, "id");
-        GENERATED_SoBOs.add(sobo);
-        GENERATED_SoBO_IDs.add(sobo.getId());
-        SoBOIdTracker.appendSoBOId(sobo.getId());
+    private boolean edgeExists(Edge edge) {
+        String query = "MATCH (a:SoBO {id: $startNodeId})-[r:" + edge.getType() + "]->(b:SoBO {id: $endNodeId}) RETURN r LIMIT 1";
+        Map<String, Object> parameters = Map.of("startNodeId", edge.getSoboObj1().getId(), "endNodeId", edge.getSoboObj2().getId());
 
-        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-
-        for (int i = 0; i < numEdges; i++) {
-            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size() - 1));
-            if (!sobo.equals(targetSoBO)) {
-                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                createEdge(edge, "id");
-            }
+        try (Session session = driver.session()) {
+            Result result = session.run(query, parameters);
+            return result.hasNext();
         }
     }
+
+    public void createEdge(Edge edge) {
+        String uniqueField = "id"; // Assuming 'id' is the unique field you want to use
+        createEdge(edge, uniqueField);
+    }
+    public void addSoBO(SoBO soboObj) {
+        String uniqueField = "id"; // Assuming 'id' is the unique field you want to use
+        addSoBO(soboObj, uniqueField);
+    }
+
+    @Override
+    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
+        try (Session session = driver.session()) {
+            SoBO sobo = SoBOGenerator.generateRandomSoBO();
+            addSoBO(sobo);
+            GENERATED_SoBOs.add(sobo);
+            GENERATED_SoBO_IDs.add(sobo.getId());
+            SoBOIdTracker.appendSoBOId(sobo.getId());
+
+            int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+            int edgesCreated = 0;
+            Set<String> connectedNodes = new HashSet<>();
+            int maxAttempts = GENERATED_SoBOs.size() * 2;  // Arbitrarily chosen, can be adjusted
+            int attempts = 0;
+
+            while (edgesCreated < numEdgesToCreate && attempts < maxAttempts) {
+                SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+
+                if (!sobo.equals(targetSoBO) && !connectedNodes.contains(targetSoBO.getId())) {
+                    Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+
+                    if (!edgeExists(edge)) {
+                        createEdge(edge);
+                        edgesCreated++;
+                        connectedNodes.add(targetSoBO.getId());
+                        logOperation("Create", "Created edge from SoBO with ID: " + sobo.getId() + " to SoBO with ID: " + targetSoBO.getId());
+                    }
+                }
+                attempts++;
+            }
+            logOperation("Create", "Created SoBO with ID: " + sobo.getId());
+        }
+    }
+
 
     public void createEdge(Edge edge, String uniqueField) {
         try (Session session = driver.session()) {
@@ -161,15 +197,23 @@ public class Neo4jService implements DatabaseService {
             // Pick a random custom ID
             String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
 //            System.out.println("Selected SoBO ID: " + randomSoBOId);  // Print the selected SoBO ID
+
             if (isOptimizationEffective()) {
-                // Use Neo4j's API to retrieve a node using custom ID and its neighbors
+//                System.out.println("Optimized way");
                 String query = "MATCH (s {id: $id})-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) RETURN neighbor.id as neighborId, type(r) as relationshipType";
                 Map<String, Object> parameters = Collections.singletonMap("id", randomSoBOId);
 
                 Result resultSet = session.run(query, parameters);
 
                 if (!resultSet.hasNext()) {
-                    System.err.println("No neighbors found for SoBO ID: " + randomSoBOId);  // Diagnostic message
+//                    System.err.println("No neighbors found for SoBO ID: " + randomSoBOId);
+
+                    // Check if the node itself exists
+                    String nodeCheckQuery = "MATCH (s {id: $id}) RETURN s";
+                    Result nodeCheckResult = session.run(nodeCheckQuery, parameters);
+                    if (!nodeCheckResult.hasNext()) {
+//                        System.err.println("Node with SoBO ID " + randomSoBOId + " does not exist.");
+                    }
                 }
 
                 StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
