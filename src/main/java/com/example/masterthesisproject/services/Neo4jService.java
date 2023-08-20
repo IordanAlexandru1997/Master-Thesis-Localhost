@@ -15,6 +15,11 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.json.Json;
+import javax.json.JsonObjectBuilder;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,6 +40,7 @@ public class Neo4jService implements DatabaseService {
 
     @org.springframework.beans.factory.annotation.Value("${neo4j.password}")
     private String PASSWORD;
+    private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
 
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
@@ -61,7 +67,19 @@ public class Neo4jService implements DatabaseService {
     }
 
 
-
+    private void logOperation(String operation, String message) {
+        try (FileWriter file = new FileWriter(OPERATIONAL_LOG_FILE, true)) {
+            JsonObjectBuilder logObjectBuilder = Json.createObjectBuilder();
+            logObjectBuilder.add("database", "Neo4j")
+                    .add("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
+                    .add("details", Json.createObjectBuilder()
+                            .add("operation", operation)
+                            .add("message", message));
+            file.write(logObjectBuilder.build().toString() + "\n");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void addSoBO(SoBO soboObj, String uniqueField) {
         try (Session session = driver.session()) {
@@ -75,25 +93,6 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    public void createEdge(Edge edge, String uniqueField) {
-        try (Session session = driver.session()) {
-            SoBO soboObj1 = edge.getSoboObj1();
-            SoBO soboObj2 = edge.getSoboObj2();
-
-            StringBuilder queryBuilder = new StringBuilder();
-
-            queryBuilder.append("MATCH (n {").append("`").append(uniqueField).append("`").append(": $").append("value1}), ");
-            queryBuilder.append("(m {").append("`").append(uniqueField).append("`").append(": $").append("value2}) ");
-            queryBuilder.append("MERGE (n)-[r:").append(edge.getType()).append("]->(m) SET r += $properties");
-
-            Map<String, Object> params = new HashMap<>();
-            params.put("value1", soboObj1.getProperties().get(uniqueField));
-            params.put("value2", soboObj2.getProperties().get(uniqueField));
-            params.put("properties", edge.getProperties());
-
-            session.run(queryBuilder.toString(), params);
-        }
-    }
 
     public void clearDatabase() {
         try (Session session = driver.session()) {
@@ -101,30 +100,53 @@ public class Neo4jService implements DatabaseService {
             session.run(query);
         }
     }
-
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
-        // Create and add SoBO
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
 
-        // Determine how many edges to generate for this SoBO
         int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
-//        System.out.println("numedges : "+ numEdges);
-        for (int i = 0; i < numEdges; i++) {
-            // Randomly select a previous SoBO to connect with
-            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
 
-            // Avoid self-connections
+        for (int i = 0; i < numEdges; i++) {
+            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size() - 1));
             if (!sobo.equals(targetSoBO)) {
                 Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
                 createEdge(edge, "id");
             }
         }
     }
+
+    public void createEdge(Edge edge, String uniqueField) {
+        try (Session session = driver.session()) {
+            String soboObj1Id = edge.getSoboObj1().getProperties().get(uniqueField).toString();
+            String soboObj2Id = edge.getSoboObj2().getProperties().get(uniqueField).toString();
+
+            // Check if an edge already exists between the two SoBOs
+            String edgeExistsQuery = "MATCH (a {id: $id1})-[r:RELATED_TO]->(b {id: $id2}) RETURN r";
+            Map<String, Object> params = Map.of("id1", soboObj1Id, "id2", soboObj2Id);
+            Result resultSet = session.run(edgeExistsQuery, params);
+
+            if (!resultSet.hasNext()) {
+                StringBuilder queryBuilder = new StringBuilder();
+                queryBuilder.append("MATCH (n {").append("`").append(uniqueField).append("`").append(": $").append("value1}), ");
+                queryBuilder.append("(m {").append("`").append(uniqueField).append("`").append(": $").append("value2}) ");
+                queryBuilder.append("MERGE (n)-[r:").append(edge.getType()).append("]->(m) SET r += $properties");
+
+                Map<String, Object> edgeParams = new HashMap<>();
+                edgeParams.put("value1", soboObj1Id);
+                edgeParams.put("value2", soboObj2Id);
+                edgeParams.put("properties", edge.getProperties());
+
+                session.run(queryBuilder.toString(), edgeParams);
+            }
+        }
+    }
+
+
+
     @Override
     public void read() {
         try (Session session = driver.session()) {
@@ -186,7 +208,8 @@ public class Neo4jService implements DatabaseService {
                     System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
 
-            }
+            }        logOperation("Read", "Read SoBO with custom ID: " + randomSoBOId);
+
         }
     }
 
@@ -226,6 +249,8 @@ public class Neo4jService implements DatabaseService {
             updatedIds.add(id); // Add to updated IDs
 //            System.out.println("Updated ID: " + id);
         }
+        logOperation("Update", "Updated SoBO with ID: " + id);
+
     }
 
     @Override
@@ -247,6 +272,8 @@ public class Neo4jService implements DatabaseService {
 
         soboIds.remove(soboIdToDelete);
         SoBOIdTracker.saveSoBOIds(soboIds);
+        logOperation("Delete", "Deleted SoBO with ID: " + soboIdToDelete);
+
     }
 
 
@@ -256,10 +283,10 @@ public class Neo4jService implements DatabaseService {
         return soboIds.get(randomIndex);
     }
 
+
     @Override
-    public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete, int numEntries, int minEdgesPerNode, int maxEdgesPerNode) {
-        DatabaseBenchmark benchmark = new DatabaseBenchmark(this, numEntries);
-        benchmark.runBenchmark(percentCreate, percentRead, percentUpdate, percentDelete, minEdgesPerNode, maxEdgesPerNode);
+    public String getDatabaseName() {
+        return "Neo4j";
     }
 
 

@@ -9,7 +9,6 @@ import com.arangodb.entity.BaseDocument;
 import com.arangodb.model.GraphCreateOptions;
 import com.arangodb.model.HashIndexOptions;
 import com.arangodb.util.MapBuilder;
-import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
