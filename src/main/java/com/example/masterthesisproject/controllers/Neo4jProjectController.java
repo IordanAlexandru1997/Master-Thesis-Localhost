@@ -14,21 +14,21 @@ public class Neo4jProjectController {
     private Neo4jService neo4jService;
 
 
-    @PostMapping("/sobo/{uniqueKey}")
-    public ResponseEntity<String> addSoBO(@PathVariable String uniqueKey, @RequestBody SoBO soboObj) {
-        neo4jService.addSoBO(soboObj, uniqueKey);
-        return new ResponseEntity<>("SoBO object added", HttpStatus.CREATED);
-    }
-
-    @PostMapping("/create-edge/{uniqueKey}")
-    public ResponseEntity<String> createEdge(@PathVariable String uniqueKey, @RequestBody Edge edge) {
-        try {
-            neo4jService.createEdge(edge, uniqueKey);
-            return ResponseEntity.ok("Relationship created successfully");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to create relationship: " + e.getMessage());
-        }
-    }
+//    @PostMapping("/sobo/{uniqueKey}")
+//    public ResponseEntity<String> addSoBO(@PathVariable String uniqueKey, @RequestBody SoBO soboObj) {
+//        neo4jService.addSoBO(soboObj, uniqueKey);
+//        return new ResponseEntity<>("SoBO object added", HttpStatus.CREATED);
+//    }
+//
+//    @PostMapping("/create-edge/{uniqueKey}")
+//    public ResponseEntity<String> createEdge(@PathVariable String uniqueKey, @RequestBody Edge edge) {
+//        try {
+//            neo4jService.createEdge(edge, uniqueKey);
+//            return ResponseEntity.ok("Relationship created successfully");
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to create relationship: " + e.getMessage());
+//        }
+//    }
 
 
 }

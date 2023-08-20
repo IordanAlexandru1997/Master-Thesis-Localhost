@@ -179,6 +179,7 @@ public class OrientDBService implements DatabaseService {
 
         return vertex;
     }
+
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
@@ -190,40 +191,43 @@ public class OrientDBService implements DatabaseService {
 
             int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
             int edgesCreated = 0;
-            int maxAttempts = GENERATED_SoBOs.size() * 2;  // Arbitrarily chosen, can be adjusted
-            int attempts = 0;
 
-            while (edgesCreated < numEdgesToCreate && attempts < maxAttempts) {
-                SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size()));
+            Set<SoBO> alreadyConnected = new HashSet<>(); // To keep track of nodes we've already connected with
+            alreadyConnected.add(sobo);  // Ensure we don't create an edge to the same node
 
-                if (!sobo.equals(targetSoBO)) {
-                    Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                    OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
-                    OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
+            List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
+            Collections.shuffle(potentialConnections);
 
-                    // Check if edge exists
-                    boolean edgeExists = false;
-                    try (OResultSet rs = db.query(
-                            "SELECT FROM E WHERE out = ? AND in = ? AND @class = ?",
-                            sobo1Vertex.getIdentity(), sobo2Vertex.getIdentity(), edge.getType())) {
-                        if (rs.hasNext()) {
-                            edgeExists = true;
-                        }
-                    }
+            for (SoBO targetSoBO : potentialConnections) {
+                if (edgesCreated >= numEdgesToCreate) break;
+                if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
 
-                    // If edge doesn't exist, create it
-                    if (!edgeExists) {
-                        OEdge createdEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
-                        if (edge.getProperties() != null) {
-                            for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
-                                createdEdge.setProperty(entry.getKey(), entry.getValue());
-                            }
-                        }
-                        createdEdge.save();
-                        edgesCreated++;
+                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
+                OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
+
+                // Check if edge exists
+                boolean edgeExists = false;
+                try (OResultSet rs = db.query(
+                        "SELECT FROM E WHERE out = ? AND in = ? AND @class = ?",
+                        sobo1Vertex.getIdentity(), sobo2Vertex.getIdentity(), edge.getType())) {
+                    if (rs.hasNext()) {
+                        edgeExists = true;
                     }
                 }
-                attempts++;
+
+                // If edge doesn't exist, create it
+                if (!edgeExists) {
+                    OEdge createdEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
+                    if (edge.getProperties() != null) {
+                        for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
+                            createdEdge.setProperty(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    createdEdge.save();
+                    edgesCreated++;
+                    alreadyConnected.add(targetSoBO);  // Mark this node as connected
+                }
             }
             db.commit();
             logOperation("Create", "Created SoBO with ID: " + sobo.getId());
@@ -234,6 +238,7 @@ public class OrientDBService implements DatabaseService {
     public void read() {
         // Load the custom IDs from sobo_obj.json
         List<String> soboIds = SoBOIdTracker.loadSoBOIds();
+        StringBuilder neighbors = new StringBuilder();
 
         if (soboIds.isEmpty()) {
             System.err.println("No SoBOs have been generated.");
@@ -242,57 +247,55 @@ public class OrientDBService implements DatabaseService {
 
         // Pick a random custom ID
         String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-        if (isOptimizationEffective()) {
-            // Use OrientDB's graph API to retrieve a vertex using custom ID and its neighbors
-            String query = "SELECT FROM SoBO WHERE id = ?";
-            try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+        try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+
+            if (isOptimizationEffective()) {
+                // Use OrientDB's API to retrieve a vertex using custom ID and its neighbors
+                String query = "SELECT expand(out()) FROM SoBO WHERE id = ?";
                 OResultSet resultSet = db.query(query, randomSoBOId);
 
-                OVertex soboVertex = null;
-                if (resultSet.hasNext()) {
-                    soboVertex = resultSet.next().getVertex().orElse(null);
+                while (resultSet.hasNext()) {
+                    OResult result = resultSet.next();
+                    String neighborId = result.getProperty("id");
+                    // Relationship type can be inferred based on the edge class, if needed.
+                    neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append("RELATED_TO").append("\n");  // You can adjust the relationship name as needed
                 }
-                if (soboVertex != null) {
-                    Iterable<OVertex> neighbors = soboVertex.getVertices(ODirection.OUT);
-                    for (OVertex neighbor : neighbors) {
-//                        System.out.println("Neighbor ID: " + neighbor.getProperty("id"));
-                    }
-                }
-            }
-        }else{
+
+                resultSet.close();
+            } else {
                 // Non-optimized method (existing approach)
                 // Use the picked custom ID to fetch the node
                 String nodeQuery = "SELECT FROM V WHERE id = ?";
-                try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-                    OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
+                OResultSet nodeResult = db.query(nodeQuery, randomSoBOId);
 
-                    if (nodeResult.hasNext()) {
-                        OResult sobo = nodeResult.next();
+                if (nodeResult.hasNext()) {
+                    OResult sobo = nodeResult.next();
 //                        System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
 
-                        // Fetch the neighbors of the selected SoBO node considering all possible relationships
-                        String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
+                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
+                    String neighborsQuery = "SELECT expand(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV()) FROM V WHERE id = ?";
 
-                        OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
+                    OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
 
-                        StringBuilder neighbors = new StringBuilder("Related Neighbors: \n");
-                        while (neighborsResult.hasNext()) {
-                            OResult record = neighborsResult.next();
-                            String neighborId = record.getProperty("id");
-                            String relationshipType = record.getProperty("@class");
-                            neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
-                        }
+                    neighbors = new StringBuilder("Related Neighbors: \n");
+                    while (neighborsResult.hasNext()) {
+                        OResult record = neighborsResult.next();
+                        String neighborId = record.getProperty("id");
+                        String relationshipType = record.getProperty("@class");
+                        neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                    }
 
 //                        System.out.println(neighbors.toString());
 
-                    } else {
-                        System.err.println("No SoBO found for custom ID: " + randomSoBOId);
-                    }
+                } else {
+                    System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
             }
+        }
         logOperation("Read", "Read SoBO with custom ID: " + randomSoBOId);
 
     }
+
 
 
 

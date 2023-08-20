@@ -133,41 +133,7 @@ public class ArangoDBService implements DatabaseService {
 
 
     }
-    public void createEdge(Edge edge, String edgeCollectionName) {
-        // Check if Edge collection exists and create it if not
-        if (!database.collection(edgeCollectionName).exists()) {
-            CollectionCreateOptions options = new CollectionCreateOptions();
-            options.type(CollectionType.EDGES);
-            database.createCollection(edgeCollectionName, options);
-        }
 
-        String id1 = "SoBO/" + edge.getSoboObj1().getProperties().get("id");
-        String id2 = "SoBO/" + edge.getSoboObj2().getProperties().get("id");
-
-        // Check if an edge already exists between the two SoBOs
-        String query = "FOR edge IN @@collectionName FILTER edge._from == @sourceId AND edge._to == @targetId RETURN edge";
-        Map<String, Object> bindVars = Map.of("@collectionName", edgeCollectionName, "sourceId", id1, "targetId", id2);
-        ArangoCursor<BaseEdgeDocument> cursor = database.query(query, bindVars, null, BaseEdgeDocument.class);
-
-        BaseEdgeDocument edgeDoc;
-        if (cursor.hasNext()) {
-            // If edge already exists, update its properties
-            edgeDoc = cursor.next();
-            edgeDoc.setProperties(edge.getProperties());
-            database.collection(edgeCollectionName).updateDocument(edgeDoc.getKey(), edgeDoc);
-        } else {
-            // Create Edge document
-            edgeDoc = new BaseEdgeDocument(id1, id2);
-            edgeDoc.setProperties(edge.getProperties());
-            database.collection(edgeCollectionName).insertDocument(edgeDoc);
-        }
-
-        // Throw an exception if the edge could not be created/updated
-        if (database.collection(edgeCollectionName).getDocument(edgeDoc.getKey(), BaseEdgeDocument.class) == null) {
-            throw new RuntimeException("Could not create/update Edge document with key: " + edgeDoc.getKey());
-        }
-        logOperation("Create", "Created/Updated a new Edge with key: " + edgeDoc.getKey());
-    }
 
     @Override
     public void clearDatabase() {
@@ -178,31 +144,74 @@ public class ArangoDBService implements DatabaseService {
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
         init();
     }
+    public void createEdge(Edge edge, String edgeCollectionName) {
+        // Check if Edge collection exists and create it if not
+        if (!database.collection(edgeCollectionName).exists()) {
+            CollectionCreateOptions options = new CollectionCreateOptions();
+            options.type(CollectionType.EDGES);
+            database.createCollection(edgeCollectionName, options);
+        }
+
+        String id1 = (String) edge.getSoboObj1().getProperties().get("id");
+        String id2 = (String) edge.getSoboObj2().getProperties().get("id");
+
+        // Create Edge document
+        String edgeKey = UUID.randomUUID().toString();
+        Map<String, Object> properties = edge.getProperties();
+        if(properties == null) {
+            properties = new HashMap<>();
+        }
+        BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
+        edgeDoc.setKey(edgeKey);
+        edgeDoc.setProperties(properties);
+
+        BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
+        if (existingEdge != null) {
+            database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
+        } else {
+            database.collection(edgeCollectionName).insertDocument(edgeDoc);
+        }
+
+        // Throw an exception if the edge could not be created
+        if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
+            throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
+        }
+        logOperation("Create", "Created a new Edge with key: " + edgeKey);
+
+    }
 
     @Override
     public void create(int minEdgesPerNode, int maxEdgesPerNode) {
-        // Create and add SoBO
-
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
         addSoBO(sobo, "id");
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
 
-        // Determine how many edges to generate for this SoBO
-        int numEdges = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+        int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+        int edgesCreated = 0;
 
-        for (int i = 0; i < numEdges; i++) {
-            // Randomly select a previous SoBO to connect with
-            SoBO targetSoBO = GENERATED_SoBOs.get(new Random().nextInt(GENERATED_SoBOs.size() - 1));
+        Set<SoBO> alreadyConnected = new HashSet<>(); // To keep track of nodes we've already connected with
+        alreadyConnected.add(sobo);  // Ensure we don't create an edge to the same node
 
-            // Avoid self-connections
-            if (!sobo.equals(targetSoBO)) {
-                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                createEdge(edge, "edgeCollection");
-            }
+        List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
+        Collections.shuffle(potentialConnections);
+
+        for (SoBO targetSoBO : potentialConnections) {
+            if (edgesCreated >= numEdgesToCreate) break;
+            if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
+
+            Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+            createEdge(edge, "edgeCollection");
+            edgesCreated++;
+
+            alreadyConnected.add(targetSoBO);  // Mark this node as connected
         }
     }
+
+
+
+
     @Override
     public void read() {
         List<String> soboIds = SoBOIdTracker.loadSoBOIds();
