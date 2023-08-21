@@ -46,7 +46,7 @@ jobs:
         PASSPHRASE: ${{ secrets.SERVER_SSH_KEY_PASSPHRASE }}
       run: |
         # Install SSH client
-        sudo apt-get install -y openssh-client
+        sudo yum install -y openssh-clients
 
         # Write the SSH private key from secrets to a file
         echo "$PRIVATE_KEY" > private_key.pem
