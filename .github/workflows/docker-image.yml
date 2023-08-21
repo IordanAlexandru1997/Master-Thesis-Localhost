@@ -47,7 +47,7 @@ jobs:
     - name: List Docker images
       run: docker images
 
-    - name: Deploy to server
+       - name: Deploy to server
       env:
         DEPLOY_SERVER: 141.26.157.78
         DEPLOY_USER: alex
@@ -56,6 +56,10 @@ jobs:
       run: |
         # Install SSH client
         sudo yum install -y openssh-clients
+
+        # Write the SSH private key from secrets to a file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
 
         # Start the ssh-agent and add the private key with passphrase
         eval $(ssh-agent -s)
