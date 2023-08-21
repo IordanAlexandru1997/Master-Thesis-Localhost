@@ -1,4 +1,4 @@
-name: Docker Build and Push
+name: Docker Build and Deploy
 
 on:
   push:
@@ -36,4 +36,24 @@ jobs:
       with:
         context: .
         push: true
-        tags: alexandru1997/my-spring-thesis:latest  # Replace 'username' with your DockerHub username.
+        tags: alexandru1997/my-spring-thesis:latest
+
+    - name: Deploy to server
+      env:
+        DEPLOY_SERVER: 141.26.157.77
+        DEPLOY_USER: alex
+        PRIVATE_KEY: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+        PASSPHRASE: ${{ secrets.SERVER_SSH_KEY_PASSPHRASE }}
+      run: |
+        # Install SSH client
+        sudo apt-get install -y openssh-client
+
+        # Write the SSH private key from secrets to a file
+        echo "$PRIVATE_KEY" > private_key.pem
+        chmod 600 private_key.pem
+
+        # Push Docker image to server
+        docker save alexandru1997/my-spring-thesis:latest | ssh -o "StrictHostKeyChecking=no" -i private_key.pem -p 22 $DEPLOY_USER@$DEPLOY_SERVER "docker load"
+
+        # Clean up
+        rm -f private_key.pem
