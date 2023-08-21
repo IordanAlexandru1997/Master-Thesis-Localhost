@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # Change this line to use self-hosted runner
 
     steps:
     - name: Checkout code
@@ -64,6 +64,3 @@ jobs:
 
         # Clean up
         rm -f private_key.pem
-
-    - name: Tear down WireGuard
-      run: sudo wg-quick down wg0
