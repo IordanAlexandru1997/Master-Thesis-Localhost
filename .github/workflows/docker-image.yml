@@ -57,9 +57,9 @@ jobs:
         # Install SSH client
         sudo yum install -y openssh-clients
 
-        # Write the SSH private key from secrets to a file
-        echo "$PRIVATE_KEY" > private_key.pem
-        chmod 600 private_key.pem
+        # Start the ssh-agent and add the private key with passphrase
+        eval $(ssh-agent -s)
+        echo "$PASSPHRASE" | ssh-add private_key.pem -
 
         # Push Docker image to server
         docker save alexandru1997/my-spring-thesis:latest | ssh -o "StrictHostKeyChecking=no" -i private_key.pem -p 22 $DEPLOY_USER@$DEPLOY_SERVER "docker load"
