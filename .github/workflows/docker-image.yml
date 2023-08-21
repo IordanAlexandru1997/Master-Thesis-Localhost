@@ -38,8 +38,11 @@ jobs:
         push: true
         tags: alexandru1997/my-spring-thesis:latest
 
+    - name: Pull Docker image from Docker Hub
+      run: docker pull alexandru1997/my-spring-thesis:latest
+
     - name: Echo build result
-      run: echo "Image built successfully"
+      run: echo "Image pulled successfully from Docker Hub"
 
     - name: List Docker images
       run: docker images
