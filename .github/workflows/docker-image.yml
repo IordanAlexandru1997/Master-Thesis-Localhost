@@ -47,7 +47,7 @@ jobs:
     - name: List Docker images
       run: docker images
 
-       - name: Deploy to server
+    - name: Deploy to server
       env:
         DEPLOY_SERVER: 141.26.157.78
         DEPLOY_USER: alex
