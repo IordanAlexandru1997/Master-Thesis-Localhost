@@ -38,6 +38,19 @@ jobs:
         push: true
         tags: alexandru1997/my-spring-thesis:latest
         
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: alexandru1997/my-spring-thesis:latest
+      
+      - name: Echo build result
+        run: echo "Image built successfully"
+      
+      - name: List Docker images
+        run: docker images
+
     - name: Deploy to server
       env:
         DEPLOY_SERVER: 141.26.157.78
