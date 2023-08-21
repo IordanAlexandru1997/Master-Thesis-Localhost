@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted  # Change this line to use self-hosted runner
+    runs-on: self-hosted
 
     steps:
     - name: Checkout code
@@ -38,13 +38,6 @@ jobs:
         push: true
         tags: alexandru1997/my-spring-thesis:latest
         
-    - name: Setup WireGuard
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wireguard-tools resolvconf
-        echo "${{ secrets.WIREGUARD_CONFIG }}" > wg0.conf
-        sudo wg-quick up ./wg0.conf
-
     - name: Deploy to server
       env:
         DEPLOY_SERVER: 141.26.157.78
