@@ -141,7 +141,9 @@ public class ArangoDBService implements DatabaseService {
             arangoDB.db(DB_NAME).drop();
         }
         arangoDB.createDatabase(DB_NAME);
+//        arangoDB.db(DB_NAME).collection("edgeCollection").truncate();
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
+
         init();
     }
     public void createEdge(Edge edge, String edgeCollectionName) {
@@ -191,21 +193,21 @@ public class ArangoDBService implements DatabaseService {
         int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
         int edgesCreated = 0;
 
-        Set<SoBO> alreadyConnected = new HashSet<>(); // To keep track of nodes we've already connected with
-        alreadyConnected.add(sobo);  // Ensure we don't create an edge to the same node
+        Set<SoBO> alreadyConnected = new HashSet<>();
+        alreadyConnected.add(sobo);
 
         List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
         Collections.shuffle(potentialConnections);
 
         for (SoBO targetSoBO : potentialConnections) {
             if (edgesCreated >= numEdgesToCreate) break;
-            if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
+            if (alreadyConnected.contains(targetSoBO)) continue;
 
             Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
             createEdge(edge, "edgeCollection");
             edgesCreated++;
 
-            alreadyConnected.add(targetSoBO);  // Mark this node as connected
+            alreadyConnected.add(targetSoBO);
         }
     }
 
