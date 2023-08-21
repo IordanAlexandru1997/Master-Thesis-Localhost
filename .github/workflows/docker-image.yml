@@ -37,13 +37,14 @@ jobs:
         context: .
         push: true
         tags: alexandru1997/my-spring-thesis:latest
-
+        
     - name: Setup WireGuard
       run: |
         sudo apt-get update
-        sudo apt-get install -y wireguard-tools
+        sudo apt-get install -y wireguard-tools resolvconf
         echo "${{ secrets.WIREGUARD_CONFIG }}" > wg0.conf
         sudo wg-quick up ./wg0.conf
+
 
     - name: Deploy to server
       env:
