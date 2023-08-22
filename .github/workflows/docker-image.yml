@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
     - name: Checkout code
@@ -38,22 +38,48 @@ jobs:
         push: true
         tags: alexandru1997/my-spring-thesis:latest
 
+    - name: Echo build result
+      run: echo "Image pushed successfully to Docker Hub"
+
     - name: Deploy to server
       env:
-        DEPLOY_SERVER: 141.26.157.77
+        DEPLOY_SERVER: 141.26.157.78
         DEPLOY_USER: alex
         PRIVATE_KEY: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
         PASSPHRASE: ${{ secrets.SERVER_SSH_KEY_PASSPHRASE }}
       run: |
-        # Install SSH client
-        sudo apt-get install -y openssh-client
+        # Install SSH client and expect tool
+        sudo yum install -y openssh-clients expect
 
         # Write the SSH private key from secrets to a file
         echo "$PRIVATE_KEY" > private_key.pem
         chmod 600 private_key.pem
 
-        # Push Docker image to server
-        docker save alexandru1997/my-spring-thesis:latest | ssh -o "StrictHostKeyChecking=no" -i private_key.pem -p 22 $DEPLOY_USER@$DEPLOY_SERVER "docker load"
+        # Start the ssh-agent
+        eval $(ssh-agent -s)
+
+        # Use expect script to automate passphrase input
+        /usr/bin/expect <<EOD
+        spawn ssh-add private_key.pem
+        expect "Enter passphrase for private_key.pem:"
+        send "$PASSPHRASE\r"
+        expect eof
+        EOD
+
+        # Push Docker image to server and update the running container
+        ssh -o "StrictHostKeyChecking=no" -i private_key.pem $DEPLOY_USER@$DEPLOY_SERVER <<EOL
+        # Pull the latest Docker image
+        docker pull alexandru1997/my-spring-thesis:latest
+
+        # Stop the current running container (adjust if the container name is different)
+        docker stop my-spring-app
+
+        # Remove the old container
+        docker rm my-spring-app
+
+        # Start a new container using the latest image
+        docker run -d -p 8080:8080 --name my-spring-app alexandru1997/my-spring-thesis:latest
+        EOL
 
         # Clean up
         rm -f private_key.pem
