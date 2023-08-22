@@ -33,13 +33,19 @@ public class DatabaseBenchmark {
     }
 
     private void logOperation(String operation, int percent, double duration, int records, int minEdges, int maxEdges, FileWriter file) throws IOException {
+        double roundedDuration = roundToThreeDecimals(duration);
+
+        if(roundedDuration == 0) {
+            return;
+        }
+
         JsonObjectBuilder logObjectBuilder = Json.createObjectBuilder();
         logObjectBuilder.add("operationDetails", Json.createObjectBuilder()
                 .add("database_name", service.getDatabaseName())
                 .add("timestamp", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(new Date()))
                 .add("operation", operation)
                 .add("percent", percent)
-                .add("duration", duration)
+                .add("duration", roundedDuration)
                 .add("records", records)
                 .add("min_edges_per_node", minEdges)
                 .add("max_edges_per_node", maxEdges)
@@ -89,4 +95,8 @@ public class DatabaseBenchmark {
             e.printStackTrace();
         }
     }
+    private double roundToThreeDecimals(double value) {
+        return Math.round(value * 1000.0) / 1000.0;
+    }
+
 }

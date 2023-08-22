@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logs</title>
+    <style>
+        /* Basic styling for the page */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #logsContent {
+            border: 1px solid #ddd;
+            padding: 20px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap; /* For preserving whitespace and line breaks */
+            overflow: auto;        /* For adding scrollbar if content overflows */
+            max-height: 500px;
+        }
+
+        #downloadButton {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        #downloadButton:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Logs</h1>
+<div id="logsContent">${logsContent}</div>
+<a href="/downloadLogs" id="downloadButton">Download Logs</a>
+
+
+<script>
+    // Fetch the logs data and display it on the page
+    fetch('/logs')
+        .then(response => response.json())
+        .then(data => {
+            const logsContentEl = document.getElementById('logsContent');
+            logsContentEl.textContent = JSON.stringify(data, null, 4);
+        })
+        .catch(error => {
+            console.error('Failed to fetch and display the logs data.', error);
+        });
+
+</script>
+
+</body>
+</html>
