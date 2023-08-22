@@ -153,9 +153,19 @@ public class OrientDBService implements DatabaseService {
     @Override
     public void clearDatabase() {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
+
+            // Delete all edges of type 'RELATED_TO'
+            db.command("DELETE EDGE RELATED_TO");
+
+            // Delete all vertices of type 'SoBO'
             db.command("DELETE VERTEX SoBO");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to clear OrientDB database.", e);
         }
     }
+
 
     private OVertex getOrCreateVertex(SoBO sobo, ODatabaseSession db) {
         OVertex vertex;

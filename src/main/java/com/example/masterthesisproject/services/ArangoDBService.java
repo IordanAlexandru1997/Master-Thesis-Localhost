@@ -141,11 +141,14 @@ public class ArangoDBService implements DatabaseService {
             arangoDB.db(DB_NAME).drop();
         }
         arangoDB.createDatabase(DB_NAME);
-//        arangoDB.db(DB_NAME).collection("edgeCollection").truncate();
+        // Truncate edgeCollection
+        if (arangoDB.db(DB_NAME).collection("edgeCollection").exists()) {
+            arangoDB.db(DB_NAME).collection("edgeCollection").truncate();
+        }
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
-
         init();
     }
+
     public void createEdge(Edge edge, String edgeCollectionName) {
         // Check if Edge collection exists and create it if not
         if (!database.collection(edgeCollectionName).exists()) {
