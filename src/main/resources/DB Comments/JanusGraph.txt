@@ -2,5 +2,5 @@
 -> a lot of debugging issues....
 
 business case:
-issues with the serializer. it is not working properly. The information sent to the server is not the same as the one received by the server
+issues with the serializer. it is not working properly. The information sent to the server is not the same as the one received by the server.
 The serializer works with the following fields: Project, Employee, Invoice. But does not work with relationships since it does not know the concept of edges.
