@@ -56,6 +56,7 @@ public class DatabaseBenchmark {
 
     public void runBenchmark(int percentCreate, int percentRead, int percentUpdate, int percentDelete,
                              int minEdgesPerNode, int maxEdgesPerNode) {
+        SoBOGenerator.initializeCreation();
 
         if (percentCreate != 0) {
             SoBOIdTracker.clearSoBOFile();
@@ -64,30 +65,38 @@ public class DatabaseBenchmark {
 
         System.out.println("Starting operation timing for " + service.getDatabaseName());
         try (FileWriter file = new FileWriter("template_timings.json", true)) {
+            double totalInsertionTime = 0.0;
+
+            for (int i = 0; i < (numEntries * percentCreate / 100); i++) {
+                totalInsertionTime += service.create(minEdgesPerNode, maxEdgesPerNode); // capture the insertion time
+            }
+            totalInsertionTime = totalInsertionTime / 1000; // Convert to seconds
+            logOperation("Insertion Time", percentCreate, totalInsertionTime, numEntries * percentCreate / 100, minEdgesPerNode, maxEdgesPerNode, file);
+
+
             Map<String, Runnable> operations = Map.of(
-                    "Create", () -> service.create(minEdgesPerNode, maxEdgesPerNode),
                     "Read", service::read,
                     "Update", service::update,
                     "Delete", service::delete
             );
 
             Map<String, Integer> percentages = Map.of(
-                    "Create", percentCreate,
                     "Read", percentRead,
                     "Update", percentUpdate,
                     "Delete", percentDelete
             );
 
-            for (String operation : List.of("Create", "Read", "Update", "Delete")) {
+            for (String operation : List.of("Read", "Update", "Delete")) {
                 int recordsAffected = numEntries * percentages.get(operation) / 100;
 
                 long startTime = System.nanoTime();
                 for (int i = 0; i < (numEntries * percentages.get(operation) / 100); i++) {
-                    operations.get(operation).run();
+                    operations.get(operation).run(); // crucial line that runs the "runner"
                 }
                 long endTime = System.nanoTime();
                 double duration = (endTime - startTime) / 1_000_000_000.0;
                 logOperation(operation, percentages.get(operation), duration, recordsAffected, minEdgesPerNode, maxEdgesPerNode, file);
+
             }
 
             System.out.println("Process finished.");

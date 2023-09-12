@@ -81,7 +81,18 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    public void addSoBO(SoBO soboObj, String uniqueField) {
+    public void clearDatabase() {
+        try (Session session = driver.session()) {
+            String query = "MATCH (n) DETACH DELETE n";
+            session.run(query);
+        }
+
+    }
+
+
+
+    public void addSoBO(SoBO soboObj) {
+        String uniqueField = "id";
         try (Session session = driver.session()) {
             Map<String, Object> properties = soboObj.getProperties();
             StringBuilder queryBuilder = new StringBuilder();
@@ -93,24 +104,17 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-
-    public void clearDatabase() {
-        try (Session session = driver.session()) {
-            String query = "MATCH (n) DETACH DELETE n";
-            session.run(query);
-        }
-
-    }
-
-    public void addSoBO(SoBO soboObj) {
-        String uniqueField = "id"; // Assuming 'id' is the unique field you want to use
-        addSoBO(soboObj, uniqueField);
-    }
     @Override
-    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
+    public long create(int minEdgesPerNode, int maxEdgesPerNode) {
+        // Clear the static lists
         try (Session session = driver.session()) {
             SoBO sobo = SoBOGenerator.generateRandomSoBO();
+            // Measure the time before insertion
+            long startInsertionTime = System.currentTimeMillis();
             addSoBO(sobo);
+            // Measure the time after insertion and calculate the difference
+            long endInsertionTime = System.currentTimeMillis();
+            long insertionDuration = endInsertionTime - startInsertionTime;
             GENERATED_SoBOs.add(sobo);
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
@@ -136,11 +140,12 @@ public class Neo4jService implements DatabaseService {
                     logOperation("Create", "Created edge from SoBO with ID: " + sobo.getId() + " to SoBO with ID: " + targetSoBO.getId());
                 }
             }
-            logOperation("Create", "Created SoBO with ID: " + sobo.getId());
+            return insertionDuration;
         }
+
     }
 
-    public void createEdge(Edge edge) {  // Removed 'uniqueField' argument since it's not used
+    public void createEdge(Edge edge) {
         try (Session session = driver.session()) {
             String soboObj1Id = (String) edge.getSoboObj1().getProperties().get("id");
             String soboObj2Id = (String) edge.getSoboObj2().getProperties().get("id");
@@ -172,7 +177,6 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-
     @Override
     public void read() {
         try (Session session = driver.session()) {
@@ -186,58 +190,45 @@ public class Neo4jService implements DatabaseService {
 
             // Pick a random custom ID
             String randomSoBOId = soboIds.get(new Random().nextInt(soboIds.size()));
-//            System.out.println("Selected SoBO ID: " + randomSoBOId);  // Print the selected SoBO ID
-            StringBuilder neighbors = new StringBuilder();
+            StringBuilder details = new StringBuilder("Selected SoBO with ID: " + randomSoBOId + "; Neighbors: ");
+
             if (isOptimizationEffective()) {
-                // Use Neo4j's API to retrieve a node using custom ID and its neighbors
-                String query = "MATCH ({id: $id})-[:RELATED_TO]-(neighbors) RETURN neighbors;";
+                // Use Neo4j's API to retrieve a node using custom ID and its neighbors (both in and out)
+                String query = "MATCH (n {id: $id})-[:RELATED_TO]-(neighbor) RETURN neighbor.id AS neighborId";
                 Map<String, Object> parameters = Collections.singletonMap("id", randomSoBOId);
 
                 Result resultSet = session.run(query, parameters);
 
-                if (!resultSet.hasNext()) {
-                    System.err.println("No neighbors found for SoBO ID: " + randomSoBOId);  // Diagnostic message
-                }
-
                 while (resultSet.hasNext()) {
                     Record record = resultSet.next();
                     String neighborId = record.get("neighborId").asString();
-                    String relationshipType = record.get("relationshipType").asString();
-                    neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                    details.append("\nNeighbor ID: ").append(neighborId).append(", Relationship: RELATED_TO");
                 }
-            }
-
-            else {
+            } else {
                 // Use the picked custom ID to fetch the node
                 String nodeQuery = "MATCH (s {id: $id}) RETURN s";
                 Result nodeResult = session.run(nodeQuery, parameters("id", randomSoBOId));
 
                 if (nodeResult.hasNext()) {
                     Node sobo = nodeResult.next().get("s").asNode();
-//                    System.out.println("Selected SoBO with ID: " + sobo.id());  // This will display the default Neo4j node ID
 
-                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
-                    String neighborsQuery = "MATCH (s)-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]->(neighbor) WHERE ID(s) = $id RETURN neighbor, type(r) as relationshipType";
+                    // Fetch the neighbors of the selected SoBO node considering all possible relationships (both in and out)
+                    String neighborsQuery = "MATCH (s)-[r:RELATED_TO|FRIENDS_WITH|WORKS_WITH]-(neighbor) WHERE ID(s) = $id RETURN neighbor.id AS neighborId, type(r) as relationshipType";
                     Result neighborsResult = session.run(neighborsQuery, parameters("id", sobo.id()));
 
-                    neighbors = new StringBuilder("Related Neighbors: \n");
                     while (neighborsResult.hasNext()) {
                         Record record = neighborsResult.next();
-                        Node neighbor = record.get("neighbor").asNode();
+                        String neighborId = record.get("neighborId").asString();
                         String relationshipType = record.get("relationshipType").asString();
-                        neighbors.append("Neighbor ID: ").append(neighbor.id()).append(", Relationship: ").append(relationshipType).append("\n");
+                        details.append("\nNeighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType);
                     }
-
-//                    System.out.println(neighbors.toString());
                 } else {
                     System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
-
-            }        logOperation("Read", "Read SoBO with custom ID: " + randomSoBOId);
-
+            }
+            logOperation("Read", details.toString());
         }
     }
-
 
 
 

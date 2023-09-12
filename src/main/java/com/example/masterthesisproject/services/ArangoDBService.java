@@ -148,7 +148,6 @@ public class ArangoDBService implements DatabaseService {
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
         init();
     }
-
     public void createEdge(Edge edge, String edgeCollectionName) {
         // Check if Edge collection exists and create it if not
         if (!database.collection(edgeCollectionName).exists()) {
@@ -160,35 +159,51 @@ public class ArangoDBService implements DatabaseService {
         String id1 = (String) edge.getSoboObj1().getProperties().get("id");
         String id2 = (String) edge.getSoboObj2().getProperties().get("id");
 
+        // Check if edge already exists
+        ArangoCursor<BaseEdgeDocument> cursor = database.query(
+                "FOR edge IN @@edgeCollectionName FILTER edge._from == @fromId AND edge._to == @toId RETURN edge",
+                new MapBuilder().put("@edgeCollectionName", edgeCollectionName).put("fromId", "SoBO/" + id1).put("toId", "SoBO/" + id2).get(),
+                BaseEdgeDocument.class
+        );
+
+        if (cursor.hasNext()) {
+            // Edge already exists
+            return;
+        }
+
         // Create Edge document
         String edgeKey = UUID.randomUUID().toString();
         Map<String, Object> properties = edge.getProperties();
-        if(properties == null) {
+        if (properties == null) {
             properties = new HashMap<>();
         }
         BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
         edgeDoc.setKey(edgeKey);
         edgeDoc.setProperties(properties);
 
-        BaseEdgeDocument existingEdge = database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class);
-        if (existingEdge != null) {
-            database.collection(edgeCollectionName).updateDocument(edgeKey, edgeDoc);
-        } else {
-            database.collection(edgeCollectionName).insertDocument(edgeDoc);
-        }
+        database.collection(edgeCollectionName).insertDocument(edgeDoc);
 
         // Throw an exception if the edge could not be created
         if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
         logOperation("Create", "Created a new Edge with key: " + edgeKey);
-
     }
-
     @Override
-    public void create(int minEdgesPerNode, int maxEdgesPerNode) {
+    public long create(int minEdgesPerNode, int maxEdgesPerNode) {
+
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
+
+        // Measure the time before insertion
+        long startInsertionTime = System.currentTimeMillis();
+
         addSoBO(sobo, "id");
+
+        // Measure the time after insertion and calculate the difference
+        long endInsertionTime = System.currentTimeMillis();
+        long insertionDuration = endInsertionTime - startInsertionTime;
+
+
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
@@ -212,8 +227,9 @@ public class ArangoDBService implements DatabaseService {
 
             alreadyConnected.add(targetSoBO);
         }
-    }
 
+        return insertionDuration;
+    }
 
 
 
@@ -229,7 +245,7 @@ public class ArangoDBService implements DatabaseService {
         StringBuilder neighbors = new StringBuilder();
 
         if (isOptimizationEffective()) {
-            String neighborsQuery = "FOR neighbor, edge IN 1..1 OUTBOUND @startVertex GRAPH @graphName " +
+            String neighborsQuery = "FOR neighbor, edge IN 1..1 ANY @startVertex GRAPH @graphName " +
                     "RETURN {neighbor: neighbor, relationshipType: edge.type}";
             Map<String, Object> bindVars = new HashMap<>();
             bindVars.put("startVertex", "SoBO/" + randomSoBOId);
@@ -246,14 +262,14 @@ public class ArangoDBService implements DatabaseService {
                     }
                 }
             }
-        }  else {
+        } else {
             String nodeQuery = "FOR s IN SoBO FILTER s.id == @id RETURN s";
             Map<String, Object> bindVars = new HashMap<>();
             bindVars.put("id", randomSoBOId);
             ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
             if (nodeResult.hasNext()) {
                 BaseDocument sobo = nodeResult.next();
-                String neighborsQuery = "FOR neighbor, edge IN OUTBOUND @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
+                String neighborsQuery = "FOR neighbor, edge IN ANY @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
                 bindVars = new MapBuilder().put("id", sobo.getId()).get();
                 ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
                 while (neighborsResult.hasNext()) {
@@ -271,10 +287,9 @@ public class ArangoDBService implements DatabaseService {
                 System.err.println("No SoBO found for custom ID: " + randomSoBOId);
             }
         }
-
         logOperation("Read", "Selected SoBO with ID: " + randomSoBOId + "; Neighbors: " + neighbors.toString());
-
     }
+
 
     private final List<String> updatedIds = new ArrayList<>();
     public String getRandomSoBOId(List<String> soboIds) {
