@@ -91,7 +91,7 @@ public class Neo4jService implements DatabaseService {
 
 
 
-    public void addSoBO(SoBO soboObj) {
+    public long addSoBO(SoBO soboObj) {
         String uniqueField = "id";
         try (Session session = driver.session()) {
             Map<String, Object> properties = soboObj.getProperties();
@@ -99,8 +99,12 @@ public class Neo4jService implements DatabaseService {
             queryBuilder.append("MERGE (s {");
             queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
             queryBuilder.append("}) SET s += $properties");
-
+            long startInsertionTime = System.currentTimeMillis();
             session.run(queryBuilder.toString(), parameters("properties", properties, uniqueField, properties.get(uniqueField)));
+            long endInsertionTime = System.currentTimeMillis();
+
+            return endInsertionTime - startInsertionTime;
+
         }
     }
 
@@ -109,12 +113,8 @@ public class Neo4jService implements DatabaseService {
         // Clear the static lists
         try (Session session = driver.session()) {
             SoBO sobo = SoBOGenerator.generateRandomSoBO();
-            // Measure the time before insertion
-            long startInsertionTime = System.currentTimeMillis();
-            addSoBO(sobo);
-            // Measure the time after insertion and calculate the difference
-            long endInsertionTime = System.currentTimeMillis();
-            long insertionDuration = endInsertionTime - startInsertionTime;
+            long insertionDuration = addSoBO(sobo);
+
             GENERATED_SoBOs.add(sobo);
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());

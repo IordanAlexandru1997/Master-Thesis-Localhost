@@ -131,24 +131,6 @@ public class OrientDBService implements DatabaseService {
         }
     }
 
-    public void addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
-        String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
-        OResultSet rs = db.query(query, sobo.getId());
-
-        OVertex soboVertex;
-        if (rs.hasNext()) {
-            soboVertex = rs.next().getVertex().get();
-        } else {
-            soboVertex = db.newVertex("SoBO");
-        }
-
-        soboVertex.setProperty(idPropertyName, sobo.getId());
-        for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
-            soboVertex.setProperty(property.getKey(), property.getValue());
-        }
-        soboVertex.save();
-        db.commit();
-    }
 
     @Override
     public void clearDatabase() {
@@ -189,15 +171,36 @@ public class OrientDBService implements DatabaseService {
 
         return vertex;
     }
+    public long addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
+        String query = "SELECT FROM SoBO WHERE " + idPropertyName + " = ?";
+        OResultSet rs = db.query(query, sobo.getId());
+
+        OVertex soboVertex;
+        if (rs.hasNext()) {
+            soboVertex = rs.next().getVertex().get();
+        } else {
+            soboVertex = db.newVertex("SoBO");
+        }
+
+        soboVertex.setProperty(idPropertyName, sobo.getId());
+        for (Map.Entry<String, Object> property : sobo.getProperties().entrySet()) {
+            soboVertex.setProperty(property.getKey(), property.getValue());
+        }
+
+        long startInsertionTime = System.currentTimeMillis();
+        soboVertex.save();
+        db.commit();
+        long endInsertionTime = System.currentTimeMillis();
+
+        return  endInsertionTime - startInsertionTime;
+
+    }
+
     @Override
     public long create(int minEdgesPerNode, int maxEdgesPerNode) {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             SoBO sobo = SoBOGenerator.generateRandomSoBO();
-
-            long startInsertionTime = System.currentTimeMillis();
-            addSoBOWithSession(sobo, "id", db);            // Measure the time after insertion and calculate the difference
-            long endInsertionTime = System.currentTimeMillis();
-            long insertionDuration = endInsertionTime - startInsertionTime;
+            long insertionDuration = addSoBOWithSession(sobo, "id", db);            // Measure the time after insertion and calculate the difference
 
 
             GENERATED_SoBOs.add(sobo);

@@ -118,22 +118,6 @@ public class ArangoDBService implements DatabaseService {
         }
     }
 
-    public void addSoBO(SoBO sobo, String keyAttr) {
-        // Define a document
-        BaseDocument soboDoc = new BaseDocument(sobo.getId());
-        soboDoc.setProperties(sobo.getProperties());
-
-        // Check if document exists and update or insert accordingly
-        if (database.collection("SoBO").documentExists(sobo.getId())) {
-            database.collection("SoBO").updateDocument(sobo.getId(), soboDoc);
-        } else {
-            database.collection("SoBO").insertDocument(soboDoc);
-        }
-        logOperation("Create", "Added a new SoBO with ID: " + sobo.getId());
-
-
-    }
-
 
     @Override
     public void clearDatabase() {
@@ -189,20 +173,29 @@ public class ArangoDBService implements DatabaseService {
         }
         logOperation("Create", "Created a new Edge with key: " + edgeKey);
     }
+
+
+    public long addSoBO(SoBO sobo, String keyAttr) {
+        // Define a document
+        BaseDocument soboDoc = new BaseDocument(sobo.getId());
+        soboDoc.setProperties(sobo.getProperties());
+        long startInsertionTime = 0;
+        long endInsertionTime = 0;
+        startInsertionTime = System.currentTimeMillis();
+        database.collection("SoBO").insertDocument(soboDoc);
+        endInsertionTime = System.currentTimeMillis();
+        logOperation("Create", "Added a new SoBO with ID: " + sobo.getId());
+        return endInsertionTime - startInsertionTime;
+
+
+    }
+
     @Override
     public long create(int minEdgesPerNode, int maxEdgesPerNode) {
 
         SoBO sobo = SoBOGenerator.generateRandomSoBO();
 
-        // Measure the time before insertion
-        long startInsertionTime = System.currentTimeMillis();
-
-        addSoBO(sobo, "id");
-
-        // Measure the time after insertion and calculate the difference
-        long endInsertionTime = System.currentTimeMillis();
-        long insertionDuration = endInsertionTime - startInsertionTime;
-
+        long insertionDuration = addSoBO(sobo, "id");
 
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
