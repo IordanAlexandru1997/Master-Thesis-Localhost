@@ -4,7 +4,7 @@ import com.arangodb.entity.BaseEdgeDocument;
 import com.arangodb.entity.EdgeDefinition;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
-
+import com.example.masterthesisproject.GlobalEdgeCount;
 import com.arangodb.entity.BaseDocument;
 import com.arangodb.model.GraphCreateOptions;
 import com.arangodb.model.HashIndexOptions;
@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 import java.io.FileWriter;
 import java.io.IOException;
 import javax.json.Json;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 
@@ -57,6 +59,7 @@ public class ArangoDBService implements DatabaseService {
     private ArangoDatabase database;
     private Boolean uiOptimizationFlag = null;
     private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
+    private static final Logger logger = LoggerFactory.getLogger(ArangoDBService.class);
 
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
@@ -196,8 +199,15 @@ public class ArangoDBService implements DatabaseService {
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
+        GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
+        int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
 
-        int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+        if (numEdgesToCreate == 0) {
+            globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
+            numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+        }
+
+        System.out.println("Arango Num edges to create: "+ numEdgesToCreate);
         int edgesCreated = 0;
 
         Set<SoBO> alreadyConnected = new HashSet<>();
@@ -207,12 +217,20 @@ public class ArangoDBService implements DatabaseService {
         Collections.shuffle(potentialConnections);
 
         for (SoBO targetSoBO : potentialConnections) {
-            if (edgesCreated >= numEdgesToCreate) break;
-            if (alreadyConnected.contains(targetSoBO)) continue;
+            if (edgesCreated == numEdgesToCreate) break;
+            if (alreadyConnected.contains(targetSoBO)) {
+                logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
+                continue;
+            }
+
 
             Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
             String edgeType = (String) edge.getProperties().get("edgeType");
+
+            logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
             createEdge(edge, edgeType);
+            logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
+
             edgesCreated++;
 
             alreadyConnected.add(targetSoBO);

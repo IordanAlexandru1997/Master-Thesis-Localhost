@@ -5,6 +5,8 @@ import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
+import com.example.masterthesisproject.GlobalEdgeCount;
+
 import org.neo4j.driver.*;
 import org.neo4j.driver.types.Node;
 import org.neo4j.driver.Record;
@@ -20,6 +22,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
@@ -39,6 +44,7 @@ public class Neo4jService implements DatabaseService {
     @org.springframework.beans.factory.annotation.Value("${neo4j.password}")
     private String PASSWORD;
     private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
+    private static final Logger logger = LoggerFactory.getLogger(Neo4jService.class);
 
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
@@ -116,7 +122,14 @@ public class Neo4jService implements DatabaseService {
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
 
-            int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+            GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
+            int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+
+            if (numEdgesToCreate == 0) {
+                globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
+                numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+            }
+
             int edgesCreated = 0;
 
             Set<SoBO> alreadyConnected = new HashSet<>();
@@ -124,18 +137,26 @@ public class Neo4jService implements DatabaseService {
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
             Collections.shuffle(potentialConnections);
+            System.out.println("Neo Num edges to create: "+ numEdgesToCreate);
 
             for (SoBO targetSoBO : potentialConnections) {
-                if (edgesCreated >= numEdgesToCreate) break;
-                if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
+                if (edgesCreated == numEdgesToCreate) break;
+                if (alreadyConnected.contains(targetSoBO)) {
+                    logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
+                    continue;
+                }
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
                 String edgeType = (String) edge.getProperties().get("edgeType");
 
 
                 // Create the edge, replacing the hardcoded edge type with the one from properties
+                logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 createEdge(edge, edgeType);
+                logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 edgesCreated++;
                 alreadyConnected.add(targetSoBO);
+
+
                 logOperation("Create", "Created edge from SoBO with ID: " + sobo.getId() + " to SoBO with ID: " + targetSoBO.getId());
             }
 

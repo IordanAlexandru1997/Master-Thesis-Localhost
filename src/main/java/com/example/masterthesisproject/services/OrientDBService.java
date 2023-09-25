@@ -5,6 +5,8 @@ import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
+import com.example.masterthesisproject.GlobalEdgeCount;
+
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
@@ -161,7 +163,6 @@ public class OrientDBService implements DatabaseService {
                 vertex.save();
             }
         }
-
         return vertex;
     }
     public long addSoBOWithSession(SoBO sobo, String idPropertyName, ODatabaseSession db) {
@@ -199,7 +200,14 @@ public class OrientDBService implements DatabaseService {
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
 
-            int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
+            GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
+            int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+
+            if (numEdgesToCreate == 0) {
+                globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
+                numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+            }
+
             int edgesCreated = 0;
 
             Set<SoBO> alreadyConnected = new HashSet<>();
@@ -207,13 +215,19 @@ public class OrientDBService implements DatabaseService {
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
             Collections.shuffle(potentialConnections);
+            System.out.println("Orient Num edges to create: "+ numEdgesToCreate);
 
             for (SoBO targetSoBO : potentialConnections) {
-                if (edgesCreated >= numEdgesToCreate) break;
-                if (alreadyConnected.contains(targetSoBO)) continue;
-
+                if (edgesCreated == numEdgesToCreate) break;
+                if (alreadyConnected.contains(targetSoBO)) {
+                    logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
+                    continue;
+                }
+                logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
                 String edgeType = (String) edge.getProperties().get("edgeType");
+                logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
+
 
 
                 OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
