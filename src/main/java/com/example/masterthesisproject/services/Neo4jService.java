@@ -94,12 +94,13 @@ public class Neo4jService implements DatabaseService {
     public long addSoBO(SoBO soboObj) {
         String uniqueField = "id";
         try (Session session = driver.session()) {
+            long startInsertionTime = System.currentTimeMillis();
+
             Map<String, Object> properties = soboObj.getProperties();
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.append("MERGE (s {");
             queryBuilder.append("`").append(uniqueField).append("`").append(": $").append(uniqueField);
             queryBuilder.append("}) SET s += $properties");
-            long startInsertionTime = System.currentTimeMillis();
             session.run(queryBuilder.toString(), parameters("properties", properties, uniqueField, properties.get(uniqueField)));
             long endInsertionTime = System.currentTimeMillis();
 

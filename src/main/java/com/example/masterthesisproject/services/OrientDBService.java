@@ -136,10 +136,8 @@ public class OrientDBService implements DatabaseService {
     public void clearDatabase() {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
 
-            // Delete all edges of type 'RELATED_TO'
             db.command("DELETE EDGE RELATED_TO");
 
-            // Delete all vertices of type 'SoBO'
             db.command("DELETE VERTEX SoBO");
 
         } catch (Exception e) {
