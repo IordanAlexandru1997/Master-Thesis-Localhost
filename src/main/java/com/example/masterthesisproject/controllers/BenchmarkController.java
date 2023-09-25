@@ -81,7 +81,6 @@ public class BenchmarkController {
 
         } catch (IOException e) {
             e.printStackTrace();
-            // You can handle this exception more gracefully if needed
         }
 
         // Return the logs content as a JSON response

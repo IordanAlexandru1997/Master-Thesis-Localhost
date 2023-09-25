@@ -1,7 +1,5 @@
 package com.example.masterthesisproject;
 
-
-import com.example.masterthesisproject.services.ArangoDBService;
 import org.springframework.beans.factory.annotation.Value;
 
 import javax.json.Json;

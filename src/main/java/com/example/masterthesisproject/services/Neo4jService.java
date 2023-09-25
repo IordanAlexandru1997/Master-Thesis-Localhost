@@ -1,6 +1,5 @@
 package com.example.masterthesisproject.services;
 
-import com.example.masterthesisproject.DatabaseBenchmark;
 import com.example.masterthesisproject.DatabaseService;
 import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
@@ -21,7 +20,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
@@ -108,10 +106,8 @@ public class Neo4jService implements DatabaseService {
 
         }
     }
-
     @Override
     public long create(int minEdgesPerNode, int maxEdgesPerNode) {
-        // Clear the static lists
         try (Session session = driver.session()) {
             SoBO sobo = SoBOGenerator.generateRandomSoBO();
             long insertionDuration = addSoBO(sobo);
@@ -123,7 +119,7 @@ public class Neo4jService implements DatabaseService {
             int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
             int edgesCreated = 0;
 
-            Set<SoBO> alreadyConnected = new HashSet<>(); // To keep track of nodes we've already connected with
+            Set<SoBO> alreadyConnected = new HashSet<>();
             alreadyConnected.add(sobo);  // Ensure we don't create an edge to the same node
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
@@ -132,29 +128,35 @@ public class Neo4jService implements DatabaseService {
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated >= numEdgesToCreate) break;
                 if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
+                Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
+                String edgeType = (String) edge.getProperties().get("edgeType");
 
-                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-                if (!edgeExists(edge)) {
-                    createEdge(edge);
-                    edgesCreated++;
-                    alreadyConnected.add(targetSoBO);  // Mark this node as connected
-                    logOperation("Create", "Created edge from SoBO with ID: " + sobo.getId() + " to SoBO with ID: " + targetSoBO.getId());
-                }
+
+                // Create the edge, replacing the hardcoded edge type with the one from properties
+                createEdge(edge, edgeType);
+                edgesCreated++;
+                alreadyConnected.add(targetSoBO);
+                logOperation("Create", "Created edge from SoBO with ID: " + sobo.getId() + " to SoBO with ID: " + targetSoBO.getId());
             }
+
             return insertionDuration;
         }
-
     }
 
-    public void createEdge(Edge edge) {
+
+    public void createEdge(Edge edge, String edgeType) {
         try (Session session = driver.session()) {
+            edgeType = (String) edge.getProperties().get("edgeType");  // Extract edge type
+
             String soboObj1Id = (String) edge.getSoboObj1().getProperties().get("id");
             String soboObj2Id = (String) edge.getSoboObj2().getProperties().get("id");
+
 
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.append("MATCH (n {id: $value1}), ");
             queryBuilder.append("(m {id: $value2}) ");
-            queryBuilder.append("MERGE (n)-[r:").append(edge.getType()).append("]->(m) SET r += $properties");
+            queryBuilder.append("MERGE (n)-[r:").append(edgeType).append("]->(m) SET r += $properties");
+
 
             Map<String, Object> edgeParams = new HashMap<>();
             edgeParams.put("value1", soboObj1Id);
@@ -165,18 +167,6 @@ public class Neo4jService implements DatabaseService {
         }
     }
 
-    public boolean edgeExists(Edge edge) {
-        try (Session session = driver.session()) {
-            String soboObj1Id = (String) edge.getSoboObj1().getProperties().get("id");
-            String soboObj2Id = (String) edge.getSoboObj2().getProperties().get("id");
-
-            String edgeExistsQuery = "MATCH (a {id: $id1})-[r:RELATED_TO]->(b {id: $id2}) RETURN r";
-            Map<String, Object> params = Map.of("id1", soboObj1Id, "id2", soboObj2Id);
-            Result resultSet = session.run(edgeExistsQuery, params);
-
-            return resultSet.hasNext();
-        }
-    }
 
     @Override
     public void read() {
@@ -206,7 +196,6 @@ public class Neo4jService implements DatabaseService {
                     details.append("\nNeighbor ID: ").append(neighborId).append(", Relationship: RELATED_TO");
                 }
             } else {
-                // Use the picked custom ID to fetch the node
                 String nodeQuery = "MATCH (s {id: $id}) RETURN s";
                 Result nodeResult = session.run(nodeQuery, parameters("id", randomSoBOId));
 
@@ -244,15 +233,13 @@ public class Neo4jService implements DatabaseService {
             return;
         }
 
-        soboIds.removeAll(updatedIds); // Remove already updated IDs
+        soboIds.removeAll(updatedIds);
 
         if (soboIds.isEmpty()) {
-//            System.out.println("All SoBOs have been updated.");
             return;
         }
 
-        String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-//        System.out.println("Selected ID for update: " + id);
+        String id = getRandomSoBOId(soboIds);
 
         try (Session session = driver.session()) {
             StringBuilder queryBuilder = new StringBuilder();
@@ -263,8 +250,7 @@ public class Neo4jService implements DatabaseService {
 
             session.run(queryBuilder.toString(), parameters("id", id));
 
-            updatedIds.add(id); // Add to updated IDs
-//            System.out.println("Updated ID: " + id);
+            updatedIds.add(id);
         }
         logOperation("Update", "Updated SoBO with ID: " + id);
 
@@ -279,8 +265,7 @@ public class Neo4jService implements DatabaseService {
             return;
         }
 
-        String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
-//        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
+        String soboIdToDelete = getRandomSoBOId(soboIds);
 
         try (Session session = driver.session()) {
             String query = "MATCH (s {id: $soboId}) DETACH DELETE s";

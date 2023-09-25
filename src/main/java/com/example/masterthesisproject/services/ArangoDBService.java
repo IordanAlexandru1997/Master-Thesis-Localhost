@@ -24,8 +24,6 @@ import javax.json.Json;
 
 import javax.annotation.PostConstruct;
 import javax.json.JsonObjectBuilder;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -133,7 +131,6 @@ public class ArangoDBService implements DatabaseService {
         init();
     }
     public void createEdge(Edge edge, String edgeCollectionName) {
-        // Check if Edge collection exists and create it if not
         if (!database.collection(edgeCollectionName).exists()) {
             CollectionCreateOptions options = new CollectionCreateOptions();
             options.type(CollectionType.EDGES);
@@ -157,17 +154,15 @@ public class ArangoDBService implements DatabaseService {
 
         // Create Edge document
         String edgeKey = UUID.randomUUID().toString();
+        String edgeType = (String) edge.getProperties().get("edgeType");  // Extract edge type
         Map<String, Object> properties = edge.getProperties();
-        if (properties == null) {
-            properties = new HashMap<>();
-        }
+        properties.put("edgeType", edgeType);
+
         BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
         edgeDoc.setKey(edgeKey);
         edgeDoc.setProperties(properties);
-
         database.collection(edgeCollectionName).insertDocument(edgeDoc);
 
-        // Throw an exception if the edge could not be created
         if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
         }
@@ -176,14 +171,15 @@ public class ArangoDBService implements DatabaseService {
 
 
     public long addSoBO(SoBO sobo, String keyAttr) {
-        // Define a document
         BaseDocument soboDoc = new BaseDocument(sobo.getId());
         soboDoc.setProperties(sobo.getProperties());
         long startInsertionTime = 0;
         long endInsertionTime = 0;
+
         startInsertionTime = System.currentTimeMillis();
         database.collection("SoBO").insertDocument(soboDoc);
         endInsertionTime = System.currentTimeMillis();
+
         logOperation("Create", "Added a new SoBO with ID: " + sobo.getId());
         return endInsertionTime - startInsertionTime;
 
@@ -214,8 +210,9 @@ public class ArangoDBService implements DatabaseService {
             if (edgesCreated >= numEdgesToCreate) break;
             if (alreadyConnected.contains(targetSoBO)) continue;
 
-            Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
-            createEdge(edge, "edgeCollection");
+            Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
+            String edgeType = (String) edge.getProperties().get("edgeType");
+            createEdge(edge, edgeType);
             edgesCreated++;
 
             alreadyConnected.add(targetSoBO);
@@ -288,43 +285,30 @@ public class ArangoDBService implements DatabaseService {
     public String getRandomSoBOId(List<String> soboIds) {
         if (soboIds.isEmpty()) {
             System.err.println("No SoBOs have been generated. Cannot fetch a random SoBO ID.");
-            return null; // or throw an exception, depending on your use case
+            return null;
         }
         int randomIndex = new Random().nextInt(soboIds.size());
         return soboIds.get(randomIndex);
     }
     @Override
     public void update() {
-        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
-
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds();
         if (soboIds.isEmpty()) {
             System.err.println("No SoBOs have been generated. Cannot perform update operation.");
             return;
         }
-
-        soboIds.removeAll(updatedIds); // Remove already updated IDs
+        soboIds.removeAll(updatedIds);
 
         if (soboIds.isEmpty()) {
-//            System.out.println("All SoBOs have been updated.");
             return;
         }
-
-        String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-//        System.out.println("Selected ID for update: " + id);
-
+        String id = getRandomSoBOId(soboIds);
         try {
             if (database.collection("SoBO").documentExists(id)) {
-                // Retrieve the existing document
                 BaseDocument document = database.collection("SoBO").getDocument(id, BaseDocument.class);
-
-                // Update the 'name' field directly
-                document.addAttribute("age", 99);
-
-                // Update the document in the database
+                document.addAttribute("name", "Updated Field");
                 database.collection("SoBO").updateDocument(id, document);
-
-                updatedIds.add(id); // Add to updated IDs
-//                System.out.println("Updated ID: " + id);
+                updatedIds.add(id);
             } else {
                 System.err.println("Document not found for ID: " + id);
             }
@@ -333,6 +317,7 @@ public class ArangoDBService implements DatabaseService {
         }
         logOperation("Update", "Updated SoBO with ID: " + id);
     }
+
 
 
 
@@ -346,8 +331,7 @@ public class ArangoDBService implements DatabaseService {
             return;
         }
 
-        String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
-//        System.out.println("Selected SoBO ID for deletion: " + soboIdToDelete);
+        String soboIdToDelete = getRandomSoBOId(soboIds);
 
         if (database.collection("SoBO").documentExists(soboIdToDelete)) {
             try {

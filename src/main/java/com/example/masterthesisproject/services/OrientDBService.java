@@ -10,7 +10,6 @@ import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
 import com.orientechnologies.orient.core.metadata.schema.OClass;
 import com.orientechnologies.orient.core.metadata.schema.OType;
-import com.orientechnologies.orient.core.record.ODirection;
 import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.executor.OResult;
@@ -104,10 +103,6 @@ public class OrientDBService implements DatabaseService {
                 logger.info("FRIENDS_WITH edge class created");
             }
 
-            if (db.getClass("RELATED_WITH") == null) {
-                db.createClass("RELATED_WITH", "E");
-                logger.info("RELATED_WITH edge class created");
-            }
             if (db.getClass("RELATED_TO") == null) {
                 db.createClass("RELATED_TO", "E");
                 logger.info("RELATED_TO edge class created");
@@ -198,8 +193,7 @@ public class OrientDBService implements DatabaseService {
     public long create(int minEdgesPerNode, int maxEdgesPerNode) {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             SoBO sobo = SoBOGenerator.generateRandomSoBO();
-            long insertionDuration = addSoBOWithSession(sobo, "id", db);            // Measure the time after insertion and calculate the difference
-
+            long insertionDuration = addSoBOWithSession(sobo, "id", db);
 
             GENERATED_SoBOs.add(sobo);
             GENERATED_SoBO_IDs.add(sobo.getId());
@@ -208,17 +202,20 @@ public class OrientDBService implements DatabaseService {
             int numEdgesToCreate = new Random().nextInt(maxEdgesPerNode - minEdgesPerNode + 1) + minEdgesPerNode;
             int edgesCreated = 0;
 
-            Set<SoBO> alreadyConnected = new HashSet<>(); // To keep track of nodes we've already connected with
-            alreadyConnected.add(sobo);  // Ensure we don't create an edge to the same node
+            Set<SoBO> alreadyConnected = new HashSet<>();
+            alreadyConnected.add(sobo);
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
             Collections.shuffle(potentialConnections);
 
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated >= numEdgesToCreate) break;
-                if (alreadyConnected.contains(targetSoBO)) continue;  // Avoid connecting to already connected nodes
+                if (alreadyConnected.contains(targetSoBO)) continue;
 
-                Edge edge = new Edge(sobo, targetSoBO, "RELATED_TO");
+                Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
+                String edgeType = (String) edge.getProperties().get("edgeType");
+
+
                 OVertex sobo1Vertex = getOrCreateVertex(edge.getSoboObj1(), db);
                 OVertex sobo2Vertex = getOrCreateVertex(edge.getSoboObj2(), db);
 
@@ -226,7 +223,7 @@ public class OrientDBService implements DatabaseService {
                 boolean edgeExists = false;
                 try (OResultSet rs = db.query(
                         "SELECT FROM E WHERE out = ? AND in = ? AND @class = ?",
-                        sobo1Vertex.getIdentity(), sobo2Vertex.getIdentity(), edge.getType())) {
+                        sobo1Vertex.getIdentity(), sobo2Vertex.getIdentity(), edgeType)) {
                     if (rs.hasNext()) {
                         edgeExists = true;
                     }
@@ -234,7 +231,7 @@ public class OrientDBService implements DatabaseService {
 
                 // If edge doesn't exist, create it
                 if (!edgeExists) {
-                    OEdge createdEdge = sobo1Vertex.addEdge(sobo2Vertex, edge.getType());
+                    OEdge createdEdge = sobo1Vertex.addEdge(sobo2Vertex, edgeType);
                     if (edge.getProperties() != null) {
                         for (Map.Entry<String, Object> entry : edge.getProperties().entrySet()) {
                             createdEdge.setProperty(entry.getKey(), entry.getValue());
@@ -242,15 +239,15 @@ public class OrientDBService implements DatabaseService {
                     }
                     createdEdge.save();
                     edgesCreated++;
-                    alreadyConnected.add(targetSoBO);  // Mark this node as connected
+                    alreadyConnected.add(targetSoBO);
                 }
             }
             db.commit();
             logOperation("Create", "Created SoBO with ID: " + sobo.getId());
             return insertionDuration;
         }
-
     }
+
 
     @Override
     public void read() {
@@ -275,7 +272,6 @@ public class OrientDBService implements DatabaseService {
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
 
             if (isOptimizationEffective()) {
-                // Use OrientDB's API to retrieve a vertex using custom ID and its neighbors
                 String query = "SELECT expand(both()) FROM SoBO WHERE id = ?";
                 OResultSet resultSet = db.query(query, randomSoBOId);
                 int neighborCount = 0;
@@ -283,7 +279,6 @@ public class OrientDBService implements DatabaseService {
                 while (resultSet.hasNext()) {
                     OResult result = resultSet.next();
                     String neighborId = result.getProperty("id");
-                    // Relationship type can be inferred based on the edge class, if needed.
                     neighbors.append("Neighbor ID: ").append(neighborId).append(", Relationship: ").append("RELATED_TO").append("\n");
                     details.append("\nNeighbor ID: ").append(neighborId).append(", Relationship: RELATED_TO");  // Adjusted the relationship name as "RELATED_TO"
                     neighborCount++;
@@ -300,9 +295,6 @@ public class OrientDBService implements DatabaseService {
 
                 if (nodeResult.hasNext()) {
                     OResult sobo = nodeResult.next();
-//                        System.out.println("Selected SoBO with custom ID: " + sobo.getProperty("id"));  // This will display the custom ID
-
-                    // Fetch the neighbors of the selected SoBO node considering all possible relationships
                     String neighborsQuery = "SELECT expand(unionall(outE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').inV(), inE('RELATED_TO', 'FRIENDS_WITH', 'WORKS_WITH').outV())) FROM V WHERE id = ?";
 
                     OResultSet neighborsResult = db.query(neighborsQuery, (Object) sobo.getProperty("id"));
@@ -316,9 +308,6 @@ public class OrientDBService implements DatabaseService {
                         details.append("\nNeighbor ID: ").append(neighborId).append(", Relationship: ").append(relationshipType);
 
                     }
-
-//                        System.out.println(neighbors.toString());
-
                 } else {
                     System.err.println("No SoBO found for custom ID: " + randomSoBOId);
                 }
@@ -344,23 +333,20 @@ public class OrientDBService implements DatabaseService {
             return;
         }
 
-        soboIds.removeAll(updatedIds); // Remove already updated IDs
+        soboIds.removeAll(updatedIds);
 
         if (soboIds.isEmpty()) {
-//            System.out.println("All SoBOs have been updated.");
             return;
         }
 
-        String id = getRandomSoBOId(soboIds); // Select a random ID from the remaining IDs
-//        System.out.println("Selected ID for update: " + id);
+        String id = getRandomSoBOId(soboIds);
 
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
             OVertex vertex = getVertexById(db, id);
             if (vertex != null) {
                 vertex.setProperty("name", "Updated Field");
                 vertex.save();
-                updatedIds.add(id); // Add to updated IDs
-//                System.out.println("Updated ID: " + id);
+                updatedIds.add(id);
             } else {
                 System.err.println("Vertex not found for ID: " + id);
             }
@@ -379,7 +365,7 @@ public class OrientDBService implements DatabaseService {
             return;
         }
 
-        String soboIdToDelete = getRandomSoBOId(soboIds); // Pick from the loaded IDs
+        String soboIdToDelete = getRandomSoBOId(soboIds);
 
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
 
@@ -390,8 +376,8 @@ public class OrientDBService implements DatabaseService {
             }
         }
 
-        soboIds.remove(soboIdToDelete); // Remove the deleted ID from the list
-        SoBOIdTracker.saveSoBOIds(soboIds); // Save the updated list back to the file
+        soboIds.remove(soboIdToDelete);
+        SoBOIdTracker.saveSoBOIds(soboIds);
         logOperation("Delete", "Deleted SoBO with ID: " + soboIdToDelete);
     }
 

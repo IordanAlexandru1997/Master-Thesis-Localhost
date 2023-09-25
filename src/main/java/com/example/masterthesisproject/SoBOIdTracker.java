@@ -17,10 +17,9 @@ public class SoBOIdTracker {
     public static List<String> loadSoBOIds() {
         try {
             File file = new File(FILE_NAME);
-            if (file.exists() && file.length() != 0) {  // Check if file has content
+            if (file.exists() && file.length() != 0) {
                 return objectMapper.readValue(file, new TypeReference<>() {});
             } else {
-//                System.out.println("No SoBO IDs found in " + FILE_NAME);
                 return new ArrayList<>();
             }
         } catch (IOException e) {
@@ -52,8 +51,7 @@ public class SoBOIdTracker {
         try {
             List<String> existingIds = loadSoBOIds();  // Load existing IDs
             existingIds.add(soboId);  // Add the new ID
-            saveSoBOIds(existingIds);  // Save back to the file
-//            System.out.println("The soboId " + soboId + " has been appended to " + FILE_NAME);
+            saveSoBOIds(existingIds);
         } catch (Exception e) {
             System.err.println("Error appending SoBO ID to " + FILE_NAME + ": " + e.getMessage());
         }

@@ -15,6 +15,11 @@ public class Edge {
         this.type = type;
         this.properties = properties;
     }
+    public Edge(SoBO soboObj1, SoBO soboObj2, Map<String, Object> properties) {
+        this.soboObj1 = soboObj1;
+        this.soboObj2 = soboObj2;
+        this.properties = properties;
+    }
     public Edge(SoBO soboObj1, SoBO soboObj2, String type) {
         this.soboObj1 = soboObj1;
         this.soboObj2 = soboObj2;
