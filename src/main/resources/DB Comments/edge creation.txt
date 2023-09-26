@@ -1,1 +1,14 @@
-I am not overloading the graph when having a high
+the edge creation is best together with sobo obj generation because it selects a random previously generated sobo and not making edges in a structured manner.
+The method of generating first sobo objects and then the edges does not work as intended. The randomized relationship overlap makes it hard to have the control over the duplicates, number of generated edges, and it's a challenge to keep the edge number under control.
+Generating edges and sobo's together is more advantageous, since it will always try to keep the boundaries of the avg edges generated per node since the beginning. easier to control and duplicate the creation behaviour across the three databases.
+
+
+Atomic Operations: If both nodes and edges are created within the same transaction, either everything will be committed or nothing will be. This ensures data integrity.
+
+Performance: A single transaction that creates both nodes and edges is likely to be faster than multiple transactions due to reduced overhead.
+
+Consistency: Creating nodes and edges at the same time ensures that the graph is always in a consistent state. You won't have nodes that are supposed to be connected existing without their corresponding edges.
+
+Simpler Logic: When nodes and edges are created together, the application logic can often be simpler. You don't have to manage two different kinds of operations or worry about the order in which they happen.
+
+Data Integrity: If the edges contain properties that are derived from the nodes they are connecting, creating both at the same time ensures that you have the most up-to-date data.

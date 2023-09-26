@@ -91,22 +91,18 @@ public class OrientDBService implements DatabaseService {
                     logger.info("Running in non-optimized mode. No index created on SoBO class.");
                 }
 
-                logger.info("SoBO vertex class created");
             }
 
             if (db.getClass("WORKS_WITH") == null) {
                 db.createClass("WORKS_WITH", "E");
-                logger.info("WORKS_WITH edge class created");
             }
 
             if (db.getClass("FRIENDS_WITH") == null) {
                 db.createClass("FRIENDS_WITH", "E");
-                logger.info("FRIENDS_WITH edge class created");
             }
 
             if (db.getClass("RELATED_TO") == null) {
                 db.createClass("RELATED_TO", "E");
-                logger.info("RELATED_TO edge class created");
             }
 
 
@@ -215,10 +211,8 @@ public class OrientDBService implements DatabaseService {
                     logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
                     continue;
                 }
-                logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
                 String edgeType = (String) edge.getProperties().get("edgeType");
-                logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
 
 
 
