@@ -4,7 +4,6 @@ import com.arangodb.entity.BaseEdgeDocument;
 import com.arangodb.entity.EdgeDefinition;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
-import com.example.masterthesisproject.GlobalEdgeCount;
 import com.arangodb.entity.BaseDocument;
 import com.arangodb.model.GraphCreateOptions;
 import com.arangodb.model.HashIndexOptions;
@@ -60,6 +59,7 @@ public class ArangoDBService implements DatabaseService {
     private Boolean uiOptimizationFlag = null;
     private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
     private static final Logger logger = LoggerFactory.getLogger(ArangoDBService.class);
+    private static final List<String> EDGE_TYPES = Arrays.asList("RELATED_TO", "FRIENDS_WITH", "WORKS_WITH");
 
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
@@ -82,22 +82,39 @@ public class ArangoDBService implements DatabaseService {
             database.createCollection("SoBO");
         }
 
-        // Ensure edgeCollection exists
-        if (!database.collection("edgeCollection").exists()) {
-            CollectionCreateOptions options = new CollectionCreateOptions();
-            options.type(CollectionType.EDGES);
-            database.createCollection("edgeCollection", options);
+        for (String edgeType : EDGE_TYPES) {
+            if (!database.collection(edgeType).exists()) {
+                CollectionCreateOptions options = new CollectionCreateOptions();
+                options.type(CollectionType.EDGES);
+                database.createCollection(edgeType, options);
+            }
         }
 
         // Ensure sobo_graph exists
         ArangoGraph graph = database.graph("sobo_graph");
         if (!graph.exists()) {
             GraphCreateOptions graphOptions = new GraphCreateOptions();
-            graph.create(Collections.singletonList(new EdgeDefinition()
-                    .collection("edgeCollection")
+
+            List<EdgeDefinition> edgeDefinitions = new ArrayList<>();
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("FRIENDS_WITH")
                     .from("SoBO")
-                    .to("SoBO")), graphOptions);
+                    .to("SoBO"));
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("RELATED_TO")
+                    .from("SoBO")
+                    .to("SoBO"));
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("WORKS_WITH")
+                    .from("SoBO")
+                    .to("SoBO"));
+
+            graph.create(edgeDefinitions, graphOptions);
         }
+
         if (isOptimizationEffective()) {
             // Create index on 'id' attribute
             soboCollection.ensureHashIndex(List.of("id"), new HashIndexOptions());
@@ -126,19 +143,17 @@ public class ArangoDBService implements DatabaseService {
             arangoDB.db(DB_NAME).drop();
         }
         arangoDB.createDatabase(DB_NAME);
-        // Truncate edgeCollection
-        if (arangoDB.db(DB_NAME).collection("edgeCollection").exists()) {
-            arangoDB.db(DB_NAME).collection("edgeCollection").truncate();
+        for (String edgeType : EDGE_TYPES) {
+            if (database.collection(edgeType).exists()) {
+                database.collection(edgeType).truncate();
+            }
         }
+
         arangoDB.db(DB_NAME).createCollection(COLLECTION_NAME);
         init();
     }
     public void createEdge(Edge edge, String edgeCollectionName) {
-        if (!database.collection(edgeCollectionName).exists()) {
-            CollectionCreateOptions options = new CollectionCreateOptions();
-            options.type(CollectionType.EDGES);
-            database.createCollection(edgeCollectionName, options);
-        }
+        String edgeType = (String) edge.getProperties().get("edgeType");
 
         String id1 = (String) edge.getSoboObj1().getProperties().get("id");
         String id2 = (String) edge.getSoboObj2().getProperties().get("id");
@@ -157,14 +172,13 @@ public class ArangoDBService implements DatabaseService {
 
         // Create Edge document
         String edgeKey = UUID.randomUUID().toString();
-        String edgeType = (String) edge.getProperties().get("edgeType");  // Extract edge type
         Map<String, Object> properties = edge.getProperties();
         properties.put("edgeType", edgeType);
 
         BaseEdgeDocument edgeDoc = new BaseEdgeDocument("SoBO/" + id1, "SoBO/" + id2);
         edgeDoc.setKey(edgeKey);
         edgeDoc.setProperties(properties);
-        database.collection(edgeCollectionName).insertDocument(edgeDoc);
+        database.collection(edgeType).insertDocument(edgeDoc);
 
         if (database.collection(edgeCollectionName).getDocument(edgeKey, BaseEdgeDocument.class) == null) {
             throw new RuntimeException("Could not create Edge document with key: " + edgeKey);
@@ -199,14 +213,7 @@ public class ArangoDBService implements DatabaseService {
         GENERATED_SoBOs.add(sobo);
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
-        GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
-        int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
-
-        if (numEdgesToCreate == 0) {
-            globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
-            numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
-        }
-
+        int numEdgesToCreate =(int) Math.round((minEdgesPerNode + maxEdgesPerNode) / 2.0);
         System.out.println("Arango Num edges to create: "+ numEdgesToCreate);
         int edgesCreated = 0;
 
@@ -227,9 +234,7 @@ public class ArangoDBService implements DatabaseService {
             Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
             String edgeType = (String) edge.getProperties().get("edgeType");
 
-            logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
             createEdge(edge, edgeType);
-            logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
 
             edgesCreated++;
 
@@ -238,7 +243,6 @@ public class ArangoDBService implements DatabaseService {
 
         return insertionDuration;
     }
-
 
 
     @Override
@@ -253,20 +257,23 @@ public class ArangoDBService implements DatabaseService {
         StringBuilder neighbors = new StringBuilder();
 
         if (isOptimizationEffective()) {
-            String neighborsQuery = "FOR neighbor, edge IN 1..1 ANY @startVertex GRAPH @graphName " +
-                    "RETURN {neighbor: neighbor, relationshipType: edge.type}";
-            Map<String, Object> bindVars = new HashMap<>();
-            bindVars.put("startVertex", "SoBO/" + randomSoBOId);
-            bindVars.put("graphName", "sobo_graph");
-            ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
-            while (neighborsResult.hasNext()) {
-                HashMap<String, Object> record = neighborsResult.next();
-                if (record != null && record.containsKey("neighbor")) {
-                    HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
-                    if (neighborMap != null) {
-                        String relationshipType = (String) record.get("relationshipType");
-                        String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
-                        neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+            for (String edgeType : EDGE_TYPES) {
+                String neighborsQuery = "FOR neighbor, edge IN 1..1 ANY @startVertex " + edgeType +
+                        " RETURN {neighbor: neighbor}";
+
+                Map<String, Object> bindVars = new HashMap<>();
+                bindVars.put("startVertex", "SoBO/" + randomSoBOId);
+                ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
+
+                while (neighborsResult.hasNext()) {
+                    HashMap<String, Object> record = neighborsResult.next();
+                    if (record != null && record.containsKey("neighbor")) {
+                        HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
+                        if (neighborMap != null) {
+                            String relationshipType = edgeType;  // Using edgeType as relationship type
+                            String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
+                            neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                        }
                     }
                 }
             }
@@ -277,17 +284,21 @@ public class ArangoDBService implements DatabaseService {
             ArangoCursor<BaseDocument> nodeResult = database.query(nodeQuery, bindVars, null, BaseDocument.class);
             if (nodeResult.hasNext()) {
                 BaseDocument sobo = nodeResult.next();
-                String neighborsQuery = "FOR neighbor, edge IN ANY @id edgeCollection RETURN {neighbor: neighbor, relationshipType: edge.type}";
-                bindVars = new MapBuilder().put("id", sobo.getId()).get();
-                ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
-                while (neighborsResult.hasNext()) {
-                    HashMap<String, Object> record = neighborsResult.next();
-                    if (record != null && record.containsKey("neighbor")) {
-                        HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
-                        if (neighborMap != null) {
-                            String relationshipType = (String) record.get("relationshipType");
-                            String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
-                            neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                for (String edgeType : EDGE_TYPES) {
+                    String neighborsQuery = "FOR neighbor, edge IN ANY @id " + edgeType + " RETURN {neighbor: neighbor}";
+
+                    bindVars = new MapBuilder().put("id", sobo.getId()).get();
+                    ArangoCursor<HashMap> neighborsResult = database.query(neighborsQuery, bindVars, null, HashMap.class);
+
+                    while (neighborsResult.hasNext()) {
+                        HashMap<String, Object> record = neighborsResult.next();
+                        if (record != null && record.containsKey("neighbor")) {
+                            HashMap<String, Object> neighborMap = (HashMap<String, Object>) record.get("neighbor");
+                            if (neighborMap != null) {
+                                String relationshipType = edgeType;  // Using edgeType as relationship type
+                                String croppedNeighborId = neighborMap.get("_id").toString().replace("SoBO/", "");
+                                neighbors.append("Neighbor ID: ").append(croppedNeighborId).append(", Relationship: ").append(relationshipType).append("\n");
+                            }
                         }
                     }
                 }
@@ -375,4 +386,3 @@ public class ArangoDBService implements DatabaseService {
 
 
 }
-

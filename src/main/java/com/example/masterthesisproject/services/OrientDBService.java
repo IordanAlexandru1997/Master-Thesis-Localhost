@@ -5,7 +5,6 @@ import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
-import com.example.masterthesisproject.GlobalEdgeCount;
 
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.OrientDB;
@@ -199,14 +198,7 @@ public class OrientDBService implements DatabaseService {
             GENERATED_SoBOs.add(sobo);
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
-
-            GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
-            int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
-
-            if (numEdgesToCreate == 0) {
-                globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
-                numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
-            }
+            int numEdgesToCreate =(int) Math.round((minEdgesPerNode + maxEdgesPerNode) / 2.0);
 
             int edgesCreated = 0;
 

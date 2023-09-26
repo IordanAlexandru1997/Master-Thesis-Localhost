@@ -5,7 +5,6 @@ import com.example.masterthesisproject.SoBOGenerator;
 import com.example.masterthesisproject.SoBOIdTracker;
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
-import com.example.masterthesisproject.GlobalEdgeCount;
 
 import org.neo4j.driver.*;
 import org.neo4j.driver.types.Node;
@@ -122,13 +121,8 @@ public class Neo4jService implements DatabaseService {
             GENERATED_SoBO_IDs.add(sobo.getId());
             SoBOIdTracker.appendSoBOId(sobo.getId());
 
-            GlobalEdgeCount globalEdgeCount = GlobalEdgeCount.getInstance();
-            int numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
+            int numEdgesToCreate =(int) Math.round((minEdgesPerNode + maxEdgesPerNode) / 2.0);
 
-            if (numEdgesToCreate == 0) {
-                globalEdgeCount.setNumEdgesToCreate(minEdgesPerNode, maxEdgesPerNode);
-                numEdgesToCreate = globalEdgeCount.getNumEdgesToCreate();
-            }
 
             int edgesCreated = 0;
 
