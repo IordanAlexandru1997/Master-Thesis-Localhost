@@ -95,11 +95,27 @@ public class ArangoDBService implements DatabaseService {
         ArangoGraph graph = database.graph("sobo_graph");
         if (!graph.exists()) {
             GraphCreateOptions graphOptions = new GraphCreateOptions();
-            graph.create(Collections.singletonList(new EdgeDefinition()
-                    .collection("edgeCollection")
+
+            List<EdgeDefinition> edgeDefinitions = new ArrayList<>();
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("FRIENDS_WITH")
                     .from("SoBO")
-                    .to("SoBO")), graphOptions);
+                    .to("SoBO"));
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("RELATED_TO")
+                    .from("SoBO")
+                    .to("SoBO"));
+
+            edgeDefinitions.add(new EdgeDefinition()
+                    .collection("WORKS_WITH")
+                    .from("SoBO")
+                    .to("SoBO"));
+
+            graph.create(edgeDefinitions, graphOptions);
         }
+
         if (isOptimizationEffective()) {
             // Create index on 'id' attribute
             soboCollection.ensureHashIndex(List.of("id"), new HashIndexOptions());
