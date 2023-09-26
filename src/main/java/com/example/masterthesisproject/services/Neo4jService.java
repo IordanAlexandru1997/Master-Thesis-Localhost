@@ -148,11 +148,7 @@ public class Neo4jService implements DatabaseService {
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);
                 String edgeType = (String) edge.getProperties().get("edgeType");
 
-
-                // Create the edge, replacing the hardcoded edge type with the one from properties
-                logger.info("Attempting to create edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 createEdge(edge, edgeType);
-                logger.info("Successfully created edge between {} and {}", sobo.getId(), targetSoBO.getId());
                 edgesCreated++;
                 alreadyConnected.add(targetSoBO);
 
