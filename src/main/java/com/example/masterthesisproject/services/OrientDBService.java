@@ -15,8 +15,6 @@ import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -53,8 +51,6 @@ public class OrientDBService implements DatabaseService {
 
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
-
-    Logger logger = LoggerFactory.getLogger(OrientDBService.class);
     private OrientDB orientDB;
     private Boolean uiOptimizationFlag = null;
 
@@ -86,9 +82,7 @@ public class OrientDBService implements DatabaseService {
 
                 if (isOptimizationEffective()) {
                     soboClass.createIndex("SoBO_ID_IDX", OClass.INDEX_TYPE.UNIQUE, "id");
-                    logger.info("Optimized index SoBO_ID_IDX created on SoBO class.");
                 } else {
-                    logger.info("Running in non-optimized mode. No index created on SoBO class.");
                 }
 
             }
@@ -208,7 +202,6 @@ public class OrientDBService implements DatabaseService {
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated == numEdgesToCreate) break;
                 if (alreadyConnected.contains(targetSoBO)) {
-                    logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
                     continue;
                 }
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);

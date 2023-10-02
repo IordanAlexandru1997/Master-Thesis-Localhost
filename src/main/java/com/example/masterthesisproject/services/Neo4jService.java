@@ -21,9 +21,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBO_IDs;
 import static com.example.masterthesisproject.SoBOGenerator.GENERATED_SoBOs;
@@ -43,7 +40,6 @@ public class Neo4jService implements DatabaseService {
     @org.springframework.beans.factory.annotation.Value("${neo4j.password}")
     private String PASSWORD;
     private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
-    private static final Logger logger = LoggerFactory.getLogger(Neo4jService.class);
 
     @Value("${optimization.enabled}")
     private boolean optimizationEnabled;
@@ -136,7 +132,6 @@ public class Neo4jService implements DatabaseService {
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated == numEdgesToCreate) break;
                 if (alreadyConnected.contains(targetSoBO)) {
-                    logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
                     continue;
                 }
                 Edge edge = SoBOGenerator.generateRandomEdge(sobo, targetSoBO);

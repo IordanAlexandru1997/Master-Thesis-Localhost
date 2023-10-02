@@ -18,8 +18,6 @@ import org.springframework.stereotype.Service;
 import java.io.FileWriter;
 import java.io.IOException;
 import javax.json.Json;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 
@@ -58,7 +56,6 @@ public class ArangoDBService implements DatabaseService {
     private ArangoDatabase database;
     private Boolean uiOptimizationFlag = null;
     private static final String OPERATIONAL_LOG_FILE = "operational_logs.json";
-    private static final Logger logger = LoggerFactory.getLogger(ArangoDBService.class);
     private static final List<String> EDGE_TYPES = Arrays.asList("RELATED_TO", "FRIENDS_WITH", "WORKS_WITH");
 
     public boolean isOptimizationEffective() {
@@ -226,7 +223,6 @@ public class ArangoDBService implements DatabaseService {
         for (SoBO targetSoBO : potentialConnections) {
             if (edgesCreated == numEdgesToCreate) break;
             if (alreadyConnected.contains(targetSoBO)) {
-                logger.warn("Skipping edge creation between {} and {} due to already existing connection", sobo.getId(), targetSoBO.getId());
                 continue;
             }
 
