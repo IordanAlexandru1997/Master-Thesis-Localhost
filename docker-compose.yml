@@ -1,0 +1,39 @@
+version: '3'
+services:
+  app:
+    depends_on:
+      - orientdb
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_JPA_OPEN_IN_VIEW: "false"
+      SPRING_MAIN_LAZY_INITIALIZATION: "true"
+      OPTIMIZATION_ENABLED: "false"
+    restart: always
+
+  orientdb:
+    image: orientdb:latest
+    ports:
+      - "2424:2424"
+      - "2480:2480"
+    environment:
+      ORIENTDB_ROOT_PASSWORD: parola
+    restart: always
+
+  neo4j:
+    image: neo4j:latest
+    ports:
+      - "7688:7687"
+    environment:
+      NEO4J_AUTH: neo4j/password
+    restart: always
+
+  arangodb:
+    image: arangodb:latest
+    ports:
+      - "8529:8529"
+    environment:
+      ARANGO_ROOT_PASSWORD: password
+      ARANGO_NO_AUTH: "0"
+    restart: always

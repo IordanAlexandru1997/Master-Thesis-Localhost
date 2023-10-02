@@ -64,6 +64,7 @@ public class OrientDBService implements DatabaseService {
 
     @PostConstruct
     public void init() {
+
         initializeSession();
     }
 
@@ -197,7 +198,6 @@ public class OrientDBService implements DatabaseService {
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
             Collections.shuffle(potentialConnections);
-            System.out.println("Orient Num edges to create: "+ numEdgesToCreate);
 
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated == numEdgesToCreate) break;

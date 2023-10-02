@@ -1,3 +1,24 @@
+764 edges, 100 records, min 5 max 10, and the average is 15.28.
+
+You have 100 nodes. If each edge is counted twice (once for each node it connects), then the total "edge instances" would be
+764
+×
+2
+=
+1528
+764×2=1528.
+
+To find the average number of edges per node, you'd do
+1528
+100
+=
+15.28
+100
+1528
+​
+ =15.28.
+
+
 docker build -t my-spring-thesis -f DockerConfig .
 docker run -p 8080:8080 my-spring-thesis
 wireguard portainer address (neo4j port) : http://10.0.1.222:7474/browser/

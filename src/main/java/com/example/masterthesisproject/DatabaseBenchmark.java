@@ -25,6 +25,8 @@ public class DatabaseBenchmark {
     }
 
     public DatabaseBenchmark(DatabaseService service, int numEntries, boolean optimizeFlag) {
+        System.out.println("Optimization Enabled: " + optimizationEnabled);
+
         this.service = service;
         this.numEntries = numEntries;
         this.uiOptimizationFlag = optimizeFlag;

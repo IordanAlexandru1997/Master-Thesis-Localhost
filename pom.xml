@@ -57,8 +57,9 @@
         <dependency>
             <groupId>com.orientechnologies</groupId>
             <artifactId>orientdb-client</artifactId>
-            <version>3.2.20</version>
+            <version>3.2.23</version> <!-- Make this match the server version -->
         </dependency>
+
         <!-- ArangoDB -->
         <dependency>
             <groupId>com.arangodb</groupId>

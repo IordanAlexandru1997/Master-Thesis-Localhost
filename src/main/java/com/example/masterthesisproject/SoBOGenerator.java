@@ -3,16 +3,11 @@ package com.example.masterthesisproject;
 
 import com.example.masterthesisproject.entities.Edge;
 import com.example.masterthesisproject.entities.SoBO;
-import com.orientechnologies.orient.core.record.OVertex;
 
 import java.util.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SoBOGenerator {
-    public static final List<String> GENERATED_SoBO_IDs = SoBOIdTracker.loadSoBOIds(); // Load existing SoBO IDs
-    private static final Logger logger = LoggerFactory.getLogger(SoBOGenerator.class);
-
+    public static final List<String> GENERATED_SoBO_IDs = SoBOIdTracker.loadSoBOIds();
     private static final List<String> KEY_NAMES = Arrays.asList("name", "email", "age", "outlook", "yahoo");
     private static final List<String> EDGE_TYPES = Arrays.asList("RELATED_TO", "FRIENDS_WITH", "WORKS_WITH");
     private static final Random RANDOM = new Random();
@@ -22,7 +17,6 @@ public class SoBOGenerator {
         String randomEdgeType = EDGE_TYPES.get(new Random().nextInt(EDGE_TYPES.size()));
         Map<String, Object> properties = new HashMap<>();
         properties.put("edgeType", randomEdgeType);
-        logger.info("Generated edge of type {} between {} and {}", randomEdgeType, sobo1.getId(), sobo2.getId());
 
         return new Edge(sobo1, sobo2, properties);
     }

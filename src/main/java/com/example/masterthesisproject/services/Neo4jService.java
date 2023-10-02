@@ -46,6 +46,7 @@ public class Neo4jService implements DatabaseService {
     private Driver driver;
     private Boolean uiOptimizationFlag = null;
 
+
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
     }
@@ -55,7 +56,6 @@ public class Neo4jService implements DatabaseService {
     @PostConstruct
     public void init() {
         driver = GraphDatabase.driver(NEO4J_URL, AuthTokens.basic(USERNAME, PASSWORD));
-
         try (Session session = driver.session()) {
             if (isOptimizationEffective()) {
                 // Create an index on the id property of the SoBO nodes for faster lookup if optimization is enabled.
@@ -127,7 +127,6 @@ public class Neo4jService implements DatabaseService {
 
             List<SoBO> potentialConnections = new ArrayList<>(GENERATED_SoBOs);
             Collections.shuffle(potentialConnections);
-            System.out.println("Neo Num edges to create: "+ numEdgesToCreate);
 
             for (SoBO targetSoBO : potentialConnections) {
                 if (edgesCreated == numEdgesToCreate) break;

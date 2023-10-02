@@ -211,7 +211,6 @@ public class ArangoDBService implements DatabaseService {
         GENERATED_SoBO_IDs.add(sobo.getId());
         SoBOIdTracker.appendSoBOId(sobo.getId());
         int numEdgesToCreate =(int) Math.round((minEdgesPerNode + maxEdgesPerNode) / 2.0);
-        System.out.println("Arango Num edges to create: "+ numEdgesToCreate);
         int edgesCreated = 0;
 
         Set<SoBO> alreadyConnected = new HashSet<>();
