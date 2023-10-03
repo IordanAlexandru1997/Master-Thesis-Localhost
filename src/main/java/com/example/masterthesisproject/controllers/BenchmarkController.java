@@ -30,13 +30,15 @@ import java.util.stream.Collectors;
 @Controller
 public class BenchmarkController {
 
-    @Autowired
+    @Autowired (required = false)
     private Neo4jService neo4jService;
 
-    @Autowired
+    @Autowired (required = false)
+
     private OrientDBService orientDBService;
 
-    @Autowired
+    @Autowired (required = false)
+
     private ArangoDBService arangoDBService;
 
     @GetMapping("/")
@@ -110,9 +112,15 @@ public class BenchmarkController {
                                @RequestParam(defaultValue = "0") int maxEdgesPerNode,
                                Model model) {
 
-        neo4jService.setUiOptimizationFlag(optimizeFlag);
-        orientDBService.setUiOptimizationFlag(optimizeFlag);
-        arangoDBService.setUiOptimizationFlag(optimizeFlag);
+        if (neo4jService != null) {
+            neo4jService.setUiOptimizationFlag(optimizeFlag);
+        }
+        if (orientDBService != null) {
+            orientDBService.setUiOptimizationFlag(optimizeFlag);
+        }
+        if (arangoDBService != null) {
+            arangoDBService.setUiOptimizationFlag(optimizeFlag);
+        }
         switch (database) {
             case "Neo4j":
                 new DatabaseBenchmark(neo4jService, numEntries, optimizeFlag)

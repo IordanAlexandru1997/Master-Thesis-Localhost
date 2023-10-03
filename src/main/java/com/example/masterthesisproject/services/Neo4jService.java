@@ -12,6 +12,7 @@ import org.neo4j.driver.Record;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -28,7 +29,6 @@ import static org.neo4j.driver.Values.parameters;
 
 @Service
 @Lazy
-
 public class Neo4jService implements DatabaseService {
 
     @org.springframework.beans.factory.annotation.Value("${neo4j.url}")
