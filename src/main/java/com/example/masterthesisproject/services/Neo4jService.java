@@ -249,7 +249,7 @@ public class Neo4jService implements DatabaseService {
         try (Session session = driver.session()) {
             StringBuilder queryBuilder = new StringBuilder();
 
-            queryBuilder.append("MATCH (s {");
+            queryBuilder.append("MERGE (s {");
             queryBuilder.append("`id`").append(": $").append("id");
             queryBuilder.append("}) SET s.name = 'Updated Field'");
 

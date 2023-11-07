@@ -5,6 +5,7 @@ import com.arangodb.entity.EdgeDefinition;
 import com.arangodb.model.CollectionCreateOptions;
 import com.arangodb.entity.CollectionType;
 import com.arangodb.entity.BaseDocument;
+import com.arangodb.model.DocumentUpdateOptions;
 import com.arangodb.model.GraphCreateOptions;
 import com.arangodb.model.HashIndexOptions;
 import com.arangodb.util.MapBuilder;
@@ -316,32 +317,46 @@ public class ArangoDBService implements DatabaseService {
     }
     @Override
     public void update() {
-        List<String> soboIds = SoBOIdTracker.loadSoBOIds();
+        List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
+
         if (soboIds.isEmpty()) {
             System.err.println("No SoBOs have been generated. Cannot perform update operation.");
             return;
         }
+
         soboIds.removeAll(updatedIds);
 
         if (soboIds.isEmpty()) {
             return;
         }
+
         String id = getRandomSoBOId(soboIds);
+
         try {
-            if (database.collection("SoBO").documentExists(id)) {
-                BaseDocument document = database.collection("SoBO").getDocument(id, BaseDocument.class);
-                document.addAttribute("name", "Updated Field");
-                database.collection("SoBO").updateDocument(id, document);
-                updatedIds.add(id);
-            } else {
-                System.err.println("Document not found for ID: " + id);
+            ArangoCollection collection = database.collection("SoBO");
+            BaseDocument newDocument = new BaseDocument();
+            newDocument.setKey(id);
+            newDocument.addAttribute("name", "Updated Field");
+
+            try {
+                // Attempt to update the existing document
+                collection.updateDocument(id, newDocument);
+            } catch (ArangoDBException e) {
+                if (e.getErrorNum() == 1202) {  // 1202 means "Document not found"
+                    // Insert the new document if it doesn't exist
+                    collection.insertDocument(newDocument);
+                } else {
+                    throw e; // Re-throw if it's some other exception
+                }
             }
+
+            updatedIds.add(id);
+            logOperation("Update", "Updated or created SoBO with ID: " + id);
+
         } catch (ArangoDBException e) {
             throw new RuntimeException("Failed to update Document with key: " + id, e);
         }
-        logOperation("Update", "Updated SoBO with ID: " + id);
     }
-
 
 
 

@@ -317,8 +317,6 @@ public class OrientDBService implements DatabaseService {
 
 
     private final List<String> updatedIds = new ArrayList<>();
-
-    @Override
     public void update() {
         List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs
 
@@ -336,18 +334,25 @@ public class OrientDBService implements DatabaseService {
         String id = getRandomSoBOId(soboIds);
 
         try (ODatabaseSession db = orientDB.open(DATABASE_NAME, USERNAME, PASSWORD)) {
-            OVertex vertex = getVertexById(db, id);
-            if (vertex != null) {
-                vertex.setProperty("name", "Updated Field");
-                vertex.save();
-                updatedIds.add(id);
-            } else {
-                System.err.println("Vertex not found for ID: " + id);
+
+            // Using SQL query for UPSERT operation
+            String query = "UPDATE SoBO SET name = ? UPSERT WHERE id = ?";
+            OResultSet resultSet = db.command(query, "Updated Field", id);
+
+            if (resultSet.hasNext()) {
+                OResult result = resultSet.next();
+                // This will retrieve the updated or inserted OVertex (record) if you need it
+                OVertex vertex = result.getVertex().orElse(null);
             }
 
-        }        logOperation("Update", "Updated SoBO with ID: " + id);
+            resultSet.close();
 
+            updatedIds.add(id);
+            logOperation("Update", "Updated or created SoBO with ID: " + id);
+        }
     }
+
+
 
 
     @Override
