@@ -314,8 +314,6 @@ public class OrientDBService implements DatabaseService {
 
 
 
-
-
     private final List<String> updatedIds = new ArrayList<>();
     public void update() {
         List<String> soboIds = SoBOIdTracker.loadSoBOIds(); // Load SoBO IDs

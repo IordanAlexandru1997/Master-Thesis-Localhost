@@ -34,9 +34,8 @@ public class MasterThesisProjectApplication {
     @Bean
     public CommandLineRunner commandLineRunner(ApplicationContext ctx) {
         return args -> {
-            Model model = new ExtendedModelMap();  // Mock model
+            Model model = new ExtendedModelMap();
 
-            // List of databases to loop through
             String[] databases = {"Neo4j", "OrientDB", "ArangoDB"};
 
             for (String database : databases) {

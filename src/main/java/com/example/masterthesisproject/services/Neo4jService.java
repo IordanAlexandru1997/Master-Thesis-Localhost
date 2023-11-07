@@ -46,7 +46,6 @@ public class Neo4jService implements DatabaseService {
     private Driver driver;
     private Boolean uiOptimizationFlag = null;
 
-
     public boolean isOptimizationEffective() {
         return uiOptimizationFlag != null ? uiOptimizationFlag : optimizationEnabled;
     }

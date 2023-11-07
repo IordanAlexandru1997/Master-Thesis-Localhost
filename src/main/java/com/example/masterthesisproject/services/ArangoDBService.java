@@ -164,7 +164,6 @@ public class ArangoDBService implements DatabaseService {
         );
 
         if (cursor.hasNext()) {
-            // Edge already exists
             return;
         }
 

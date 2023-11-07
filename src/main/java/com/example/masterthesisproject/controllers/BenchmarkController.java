@@ -78,14 +78,11 @@ public class BenchmarkController {
             // Convert the list back to a formatted JSON string
             content = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(logsList);
 
-            // Optional: Write the formatted content back to the file
-            // Files.write(Paths.get("template_timings.json"), content.getBytes(StandardCharsets.UTF_8));
 
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        // Return the logs content as a JSON response
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(content);
